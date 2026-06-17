@@ -9,13 +9,44 @@ All outputs are written under `viral-radar-out/` in the **user's current working
 
 ---
 
-## Step 1 — First run / config bootstrap
+## First run — onboarding
 
-1. Determine the target niche (default: `ai-claude`).
-2. Check whether `viral-radar-out/<niche>.config.json` exists.
-   - If **missing**: create `viral-radar-out/` and copy the bundled `config/<niche>.example.config.json` into `viral-radar-out/<niche>.config.json`. If no example config exists for this niche, prompt once for: `viralThreshold`, `velocityThreshold`, `velocityWindowHours`, and `seedHashtags`, then write a new config file with `trackedHandles: []`.
-3. Read the config. If `trackedHandles` is an empty array, tell the user: "No handles to track yet. Open `viral-radar-out/<niche>.config.json`, add the Instagram handles you want to monitor to `trackedHandles`, then re-run `/viral-radar`." Stop here.
-4. Load the seen-cache at `viral-radar-out/cache/<niche>-seen.json` (create as `{}` if missing).
+1. **First-run check:** check whether `viral-radar-out/.onboarded` exists in the user's current working directory. If it does **not** exist, run the steps below before anything else. If it **does** exist, skip this section entirely and continue to Step 1.
+
+2. **Browser/MCP check:** this skill drives an automation browser via the **chrome-devtools MCP**. Verify it is available by checking whether you have tools named `mcp__chrome-devtools__*` (e.g. attempt `mcp__chrome-devtools__list_pages`). If the tools are **not** available, tell the user verbatim:
+
+   > "The automation browser needs the chrome-devtools MCP, which isn't installed yet. Add it once by running this in your terminal:
+   > `claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest`
+   > then fully restart Claude Code and run /viral-radar again."
+
+   Then **STOP** (do not continue any further).
+
+3. **Instagram login:** use `mcp__chrome-devtools__navigate_page` to open `https://www.instagram.com/` in the automation browser. Use `mcp__chrome-devtools__take_screenshot` to check whether a login wall is visible (i.e. the user is not logged in). If Instagram is showing a login screen or gate, tell the user:
+
+   > "Instagram needs a one-time login. A browser window should be open — please log in to Instagram with your own account there. Your login is only used locally to read pages; it is never stored by this skill. Let me know when you're logged in."
+
+   Wait for the user to confirm they are logged in before continuing.
+
+4. **Ask the niche:** ask the user: "What niche are you in? (e.g. AI tools, fitness, personal finance, cooking)" Once they answer, do the following:
+   - Create `viral-radar-out/` if it does not exist.
+   - Copy `config/ai-claude.example.config.json` (located next to this SKILL.md) into `viral-radar-out/<niche>.config.json`.
+   - Set the `niche` field to the user's niche slug (lowercase, hyphenated) and the `label` field to a readable display name.
+   - If the niche is not `ai-claude` (i.e. the default config values may not apply), ask: "What view count should we use as the viral threshold for your niche? (default: 100000) And any seed hashtags?" Update `viralThreshold` and `seedHashtags` in the config with their answers.
+   - Leave `trackedHandles: []` in the config (competitors are added via `/viral-competitor`).
+
+5. **Finish:** write an empty file at `viral-radar-out/.onboarded` (create it with no content). Tell the user:
+
+   > "You're set up. Add competitors with `/viral-competitor @handle1 @handle2 ...`, or run `/viral-radar` to scrape everyone on your list."
+
+   Then **STOP** — the first run ends after onboarding. The user adds competitors next.
+
+---
+
+## Step 1 — Config bootstrap
+
+1. Determine the target niche by reading `viral-radar-out/<niche>.config.json` (use the filename that exists; if multiple exist, pick the most recently modified, or prompt if ambiguous).
+2. Read the config. If `trackedHandles` is an empty array, tell the user: "No handles to track yet. Run `/viral-competitor @handle1 @handle2` to add competitors." Stop here.
+3. Load the seen-cache at `viral-radar-out/cache/<niche>-seen.json` (create as `{}` if missing).
 
 ---
 

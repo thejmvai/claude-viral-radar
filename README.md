@@ -1,72 +1,92 @@
-# Viral Radar — Claude Code skill
+# Viral Radar — Claude Code skills
 
-A daily viral-reel research engine for a niche. Run `/viral-radar` and it scrapes the Instagram profiles you track, detects reels that hit viral thresholds, downloads storyboard frames and audio, transcribes the script, and synthesizes what's working — all written to a local dark HTML report you can read in the browser or print to PDF.
+Find viral reels in your niche from the competitors you choose. Run two commands — `/viral-radar` to set up your browser and niche, then `/viral-competitor @handle1 @handle2` to add competitors — and get a local dark HTML dossier explaining what's working and why, with storyboard frames, transcripts, hook analysis, and a ranked synthesis of replicable plays.
+
+---
+
+## Requirements
+
+- **Claude Code** — the CLI ([install](https://docs.anthropic.com/en/docs/claude-code))
+- **chrome-devtools MCP** — drives the automation browser for Instagram scraping; add once:
+  ```
+  claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+  ```
+- **yt-dlp** — `brew install yt-dlp` or `pip install yt-dlp`
+- **ffmpeg** — `brew install ffmpeg`
+- **Whisper** (optional, local transcription) — `pip install openai-whisper`
+- **GROQ_API_KEY** or **OPENAI_API_KEY** (optional) — cloud Whisper fallback for transcription
+- **nexlev MCP** (optional) — fallback enrichment when local media extraction fails
 
 ---
 
 ## Install
 
 ```bash
-git clone https://github.com/thejmvai/claude-viral-radar ~/.claude/skills/claude-viral-radar
+git clone https://github.com/thejmvai/claude-viral-radar && cd claude-viral-radar && ./install.sh
 ```
 
-Claude Code picks up skills from `~/.claude/skills/` automatically. Restart Claude Code after cloning.
-
----
-
-## Requirements
-
-- **Claude Code** — the CLI (runs this skill)
-- **yt-dlp** — `brew install yt-dlp` or `pip install yt-dlp`
-- **ffmpeg** — `brew install ffmpeg`
-- **Whisper** (optional, for local transcription) — `pip install openai-whisper`
-- **GROQ_API_KEY** or **OPENAI_API_KEY** (optional) — cloud Whisper fallback
-- **nexlev MCP** (optional) — fallback enrichment when local media extraction fails
+Restart Claude Code after installing. The skills are picked up automatically from `~/.claude/skills/`.
 
 ---
 
 ## Usage
 
-1. In your project directory, run:
-   ```
-   /viral-radar
-   ```
-2. On first run, a starter config is created at `viral-radar-out/ai-claude.config.json`. Open it and add the Instagram handles you want to track to `trackedHandles`:
-   ```json
-   "trackedHandles": ["yourhandle1", "yourhandle2"]
-   ```
-3. Re-run `/viral-radar`. The skill scrapes, enriches, and writes:
-   - `viral-radar-out/ai-claude.json` — the full dataset
-   - `viral-radar-out/report-latest.html` — the dark HTML dossier
+**1. Set up (once)**
+
+```
+/viral-radar
+```
+
+On first run, the skill checks your automation browser, walks you through a one-time Instagram login in the browser window, and asks what niche you're in. Takes about 2 minutes.
+
+**2. Add competitors**
+
+```
+/viral-competitor @creator1 @creator2
+```
+
+Adds those handles to your tracker, immediately scrapes their reels, enriches the viral ones with storyboard frames + transcript + structural analysis, and writes a fresh report.
+
+**3. Refresh anytime**
+
+```
+/viral-radar
+```
+
+Scrapes all tracked handles and rebuilds the report with new viral reels since the last run.
 
 ---
 
 ## Output
 
-Everything lands in `viral-radar-out/` inside your current working directory:
+Everything lands in `viral-radar-out/` in your current working directory:
 
 ```
 viral-radar-out/
-  ai-claude.config.json       — your niche config (edit to add handles)
-  ai-claude.json              — viral dataset (JSON)
-  cache/ai-claude-seen.json   — dedup cache (auto-managed)
+  <niche>.config.json         — your niche config and tracked handles
+  <niche>.json                — full viral dataset (JSON)
+  cache/<niche>-seen.json     — dedup cache (auto-managed)
   frames/<shortcode>/1-4.jpg  — storyboard frames
-  report-2026-06-17.html      — dated HTML report
-  report-latest.html          — symlink/copy to latest report
+  report-YYYY-MM-DD.html      — dated HTML report
+  report-latest.html          — always points to the latest report
 ```
 
-Open `report-latest.html` in Chrome and print to PDF for a shareable one-pager.
+Open `report-latest.html` in Chrome and print to PDF for a shareable dossier.
 
 ---
 
 ## How it scores
 
-Each reel gets a **signal score** (0–100) computed from engagement quality (like-rate relative to 4% benchmark), organic comment rate, breakout multiple (views ÷ creator median), and creator replicability (small accounts score higher — their results are easier to replicate).
+Each reel gets a **signal score** (0–100) combining engagement quality (like-rate relative to a 4% benchmark), organic comment rate, and breakout multiple (views divided by creator median). Reels with a like-rate below 0.5% are automatically quarantined as "boosted" — they passed volume thresholds but show signs of paid reach — and excluded from the synthesis and lessons.
 
-Reels with a like-rate below 0.5% are automatically quarantined as "boosted" — they pass volume thresholds but show signs of paid reach, so they're excluded from the lessons and synthesis.
+---
+
+## Privacy
+
+Your Instagram login stays in your local browser profile and is never read or stored by the skill. The skill only reads the public page content it navigates to in order to build your local report. Nothing is sent to any external service except the pages themselves.
 
 ---
 
 ## License
 
-MIT, Copyright (c) 2026 @jamesonc_ai
+MIT (c) 2026 @jamesonc_ai
