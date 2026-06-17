@@ -84,6 +84,10 @@ viral-radar-out/
 
 Each reel gets a **signal score** (0–100) combining engagement quality (like-rate relative to a 4% benchmark), organic comment rate, and breakout multiple (views divided by creator median). Reels with a like-rate below 0.5% are automatically quarantined as "boosted" — they passed volume thresholds but show signs of paid reach — and excluded from the synthesis and lessons.
 
+## How it ranks
+
+The report is a **full library, not a highlight reel.** Every gate-passing reel is kept — the funnel aims for **at least 5 per tracked channel** (`minPerHandle`), and no creator is trimmed to a single "best" pick. Reels are ordered by a **recency-weighted rank** that blends the signal score with **time of post**, so fresh, high-signal reels rise to the top. Tune the balance in your niche config: `recencyWeight` (0 = pure signal, 1 = pure recency; default 0.35) and `recencyHalfLifeDays` (default 30). Widen the catch with `scrapeTargetPerHandle` and `enrichmentCapPerRun`.
+
 ---
 
 ## Privacy

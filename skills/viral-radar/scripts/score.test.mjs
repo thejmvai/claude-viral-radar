@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { likeRate, commentRate, breakout, reachMultiple, qualityFlag, isViral, replicability, signalScore } from "./score.mjs";
+import { likeRate, commentRate, breakout, reachMultiple, qualityFlag, isViral, replicability, signalScore, ageHoursFrom, recencyScore, rankScore, rankReels } from "./score.mjs";
 
 test("rate metrics", () => {
   assert.equal(likeRate(26000, 1000000).toFixed(3), "0.026");
@@ -37,4 +37,41 @@ test("signalScore is 0-100 and rewards quality", () => {
   const weak = signalScore({ likeRate: 0.002, commentRate: 0.001, ctaType: "organic", breakout: 2, followers: 5000000 });
   assert.ok(strong > 60 && strong <= 100);
   assert.ok(weak < strong);
+});
+
+test("ageHoursFrom handles dates and clamps the future", () => {
+  const now = new Date("2026-06-17T00:00:00Z");
+  assert.equal(ageHoursFrom("2026-06-16T00:00:00Z", now), 24);
+  assert.equal(ageHoursFrom("2026-06-18T00:00:00Z", now), 0); // future clamps to 0
+  assert.equal(ageHoursFrom(null, now), Infinity);
+});
+
+test("recencyScore decays by half-life", () => {
+  const now = new Date("2026-06-17T00:00:00Z");
+  assert.equal(recencyScore("2026-06-17T00:00:00Z", now, 30).toFixed(2), "1.00"); // today
+  assert.equal(recencyScore("2026-05-18T00:00:00Z", now, 30).toFixed(2), "0.50"); // ~30d => half
+  assert.ok(recencyScore("2025-12-17T00:00:00Z", now, 30) < 0.05); // ~6mo => near zero
+});
+
+test("rankScore blends signal and recency by weight", () => {
+  const now = new Date("2026-06-17T00:00:00Z");
+  const fresh = { signalScore: 60, postedAt: "2026-06-16T00:00:00Z", now, recencyWeight: 0.35, halfLifeDays: 30 };
+  const stale = { signalScore: 60, postedAt: "2025-12-17T00:00:00Z", now, recencyWeight: 0.35, halfLifeDays: 30 };
+  assert.ok(rankScore(fresh) > rankScore(stale)); // same signal, fresher wins
+  // weight 0 => pure signal
+  assert.equal(rankScore({ ...stale, recencyWeight: 0 }), 60);
+});
+
+test("rankReels orders by blended score and assigns rank", () => {
+  const now = new Date("2026-06-17T00:00:00Z");
+  const reels = [
+    { shortcode: "a", signalScore: 90, postedAt: "2025-12-01" }, // high signal, old
+    { shortcode: "b", signalScore: 55, postedAt: "2026-06-15" }, // mid signal, very fresh
+    { shortcode: "c", signalScore: 40, postedAt: "2026-01-01" }, // low signal, old
+  ];
+  const ranked = rankReels(reels, { now, recencyWeight: 0.35, halfLifeDays: 30 });
+  assert.equal(ranked[0].rank, 1);
+  assert.equal(ranked[ranked.length - 1].rank, ranked.length);
+  ranked.forEach((r) => assert.ok(typeof r.rankScore === "number" && r.recencyScore >= 0 && r.recencyScore <= 1));
+  assert.equal(ranked[2].shortcode, "c"); // weakest on both axes ends last
 });
