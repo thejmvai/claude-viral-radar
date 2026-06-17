@@ -8,6 +8,10 @@
   "seedHashtags": ["claude", "claudecode", "aiagents", "aiautomation"],
   "trackedHandles": [],
   "discoveryEnabled": false,
-  "enrichmentCapPerRun": 15,
+  "scrapeTargetPerHandle": 36,
+  "minPerHandle": 5,
+  "enrichmentCapPerRun": 60,
+  "recencyWeight": 0.35,
+  "recencyHalfLifeDays": 30,
   "updatedAt": "2026-06-17"
 }

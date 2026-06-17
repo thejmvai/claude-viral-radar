@@ -55,7 +55,7 @@ All outputs are written under `viral-radar-out/` in the **user's current working
 For each handle in `config.trackedHandles`:
 
 1. Open `https://www.instagram.com/<handle>/reels/` with the chrome-devtools MCP (`navigate_page`).
-2. Scroll the grid (use `evaluate_script` to scroll and wait for new tiles) until at least 12–20 reels are loaded or no more load.
+2. Scroll the grid (use `evaluate_script` to scroll and wait for new tiles) until at least `config.scrapeTargetPerHandle` (default 36) reels are loaded or no more load. **Funnel wide:** the goal is to surface ≥ `config.minPerHandle` viral reels per creator, so keep scrolling if you have not yet found that many viral candidates and tiles are still loading.
 3. Scrape grid tiles: extract `shortcode` and view count text (e.g. "1.2M", "847K") for each tile using `evaluate_script`.
 4. Read the exact follower count from the profile header using `evaluate_script`.
 5. Compute `creatorMedianViews` as the **median** of all loaded grid view counts.
@@ -64,7 +64,7 @@ For each handle in `config.trackedHandles`:
    b. If views are in the range `[config.velocityThreshold, config.viralThreshold)`: fetch the reel page (`navigate_page` to `https://www.instagram.com/reel/<shortcode>/`) and extract the `og:description` meta tag content. Run `node scripts/parse-og.mjs` (or import its `parseOgDescription` function via inline Node execution) to get `postedAt`. Compute `ageHours` from `postedAt` to now. Apply velocity rule: viral if `ageHours < config.velocityWindowHours`.
    c. If views are `>= config.viralThreshold`: mark as viral (absolute), no age check needed.
    d. Apply `isViral` from `scripts/score.mjs` to confirm.
-7. Diff against the seen-cache. New viral shortcodes not yet in the cache form the **work-list**.
+7. Diff against the seen-cache. New viral shortcodes not yet in the cache form the **work-list**. Keep **every** new viral reel per handle — do not trim to one or a "best" pick here. If a handle yields fewer than `config.minPerHandle` viral reels, note it in the run summary (its grid may simply not have that many recent hits); never drop a handle that does clear the bar to make room for others.
 8. For each work-list reel, compute preliminary metrics using `scripts/score.mjs`:
    - `likeRate(likes, views)`, `commentRate(comments, views)` — likes/comments available from og:description
    - `breakout(views, creatorMedianViews)`
@@ -76,7 +76,13 @@ For each handle in `config.trackedHandles`:
 
 ## Step 3 — Tier 2 Enrichment
 
-Process only **new** work-list reels, capped at `config.enrichmentCapPerRun`, sorted by `signalScore` descending (highest first).
+Process only **new** work-list reels, capped at `config.enrichmentCapPerRun` (default 60). Order them so **every channel gets its floor first, then quality fills the rest**:
+
+1. Group the work-list by handle and sort each group by `signalScore` descending.
+2. **Round-robin pass:** take the top `config.minPerHandle` (default 5) reels from each handle (or all of them if a handle has fewer). This guarantees ≥5 from each channel whenever that many cleared the gate.
+3. **Fill pass:** if the cap is not yet reached, add the remaining work-list reels by `signalScore` descending until you hit `config.enrichmentCapPerRun`.
+
+Enrich reels in that combined order (floor reels first).
 
 For each reel:
 
@@ -99,8 +105,8 @@ For each reel:
 ## Step 4 — Quality gate + ranking
 
 1. Reels where `qualityFlag === "boosted"` go into `quarantined` (not ranked, excluded from synthesis).
-2. Sort gate-passing reels by `signalScore` descending.
-3. Assign `rank` 1..N sequentially.
+2. Rank gate-passing reels with `rankReels(reels, { now, recencyWeight: config.recencyWeight, halfLifeDays: config.recencyHalfLifeDays })` from `scripts/score.mjs`. This blends `signalScore` (quality) with `recencyScore` (time of post) so fresh, high-signal reels rise to the top; it writes `recencyScore`, `rankScore`, and a sequential `rank` onto each reel.
+3. **Keep the full library.** Every gate-passing reel that was enriched belongs in `reels` — do **not** collapse to a curated "one per creator" or top-N subset. The report is meant to be a rich, browsable library (≥5 per channel), not a highlight reel. The only reels excluded from `reels` are the `quarantined` ones.
 
 ---
 
@@ -135,7 +141,8 @@ Print a `SUMMARY:` line with:
 - How many new viral reels were detected
 - How many were enriched vs. partial
 - How many were quarantined
-- The top 3 by signal score (handle + score)
+- **Per-channel coverage**: reels kept per handle, and call out any handle that came in under `config.minPerHandle`
+- The top 3 by `rankScore` (handle + rankScore + postedAt)
 
 ---
 

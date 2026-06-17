@@ -31,3 +31,43 @@ export function signalScore({ likeRate: lr, commentRate: cr, ctaType, breakout: 
   const raw = 0.42 * engagement + 0.18 * organicComment + 0.25 * breakoutScore + 0.15 * replic;
   return Math.round(100 * raw);
 }
+
+// Age in hours from an ISO/`YYYY-MM-DD` postedAt to `now` (Date | ms | ISO). Negative ages clamp to 0.
+export function ageHoursFrom(postedAt, now = new Date()) {
+  if (!postedAt) return Infinity;
+  const t = new Date(postedAt).getTime();
+  const n = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  if (!Number.isFinite(t)) return Infinity;
+  return Math.max(0, (n - t) / 3.6e6);
+}
+
+// 0..1 freshness from an exponential half-life decay. A post `halfLifeDays` old scores 0.5.
+export function recencyScore(postedAt, now = new Date(), halfLifeDays = 30) {
+  const ageDays = ageHoursFrom(postedAt, now) / 24;
+  if (!Number.isFinite(ageDays)) return 0;
+  return Math.pow(0.5, ageDays / Math.max(1, halfLifeDays));
+}
+
+// 0-100 ranking score blending signal (quality) with recency (time of post).
+// recencyWeight = share of the score driven by freshness (0 = pure signal, 1 = pure recency).
+export function rankScore({ signalScore: ss, postedAt, now = new Date(), recencyWeight = 0.35, halfLifeDays = 30 }) {
+  const w = clamp(recencyWeight, 0, 1);
+  const rec = recencyScore(postedAt, now, halfLifeDays);
+  return Math.round((1 - w) * ss + w * 100 * rec);
+}
+
+// Rank a list of gate-passing reels by rankScore (desc); ties break to the newer post.
+// Mutates+returns each reel with { recencyScore, rankScore, rank }. `now` defaults to current time.
+export function rankReels(reels, { now = new Date(), recencyWeight = 0.35, halfLifeDays = 30 } = {}) {
+  const scored = reels.map((r) => {
+    const rec = recencyScore(r.postedAt, now, halfLifeDays);
+    return {
+      ...r,
+      recencyScore: +rec.toFixed(4),
+      rankScore: rankScore({ signalScore: r.signalScore, postedAt: r.postedAt, now, recencyWeight, halfLifeDays }),
+    };
+  });
+  scored.sort((a, b) => b.rankScore - a.rankScore || new Date(b.postedAt) - new Date(a.postedAt));
+  scored.forEach((r, i) => (r.rank = i + 1));
+  return scored;
+}
