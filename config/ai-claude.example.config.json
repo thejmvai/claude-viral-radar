@@ -1,0 +1,13 @@
+{
+  "niche": "ai-claude",
+  "label": "AI / Claude",
+  "viralThreshold": 100000,
+  "velocityThreshold": 50000,
+  "velocityWindowHours": 48,
+  "qualityGateLikeRate": 0.005,
+  "seedHashtags": ["claude", "claudecode", "aiagents", "aiautomation"],
+  "trackedHandles": [],
+  "discoveryEnabled": false,
+  "enrichmentCapPerRun": 15,
+  "updatedAt": "2026-06-17"
+}

@@ -1,0 +1,34 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+export function frameTimecodes(durationSec, n = 4) {
+  // percentages across the clip: ~5/35/65/92% for n=4
+  const pcts = n === 4 ? [0.05, 0.35, 0.65, 0.92] : Array.from({ length: n }, (_, i) => (i + 0.5) / n);
+  return pcts.map((p) => Math.max(1, +(p * durationSec).toFixed(2)));
+}
+
+// Download a reel and extract n frames + audio. Returns { videoPath, audioPath, frames: [paths], durationSec }.
+export function extractMedia(reelUrl, outDir, n = 4) {
+  fs.mkdirSync(outDir, { recursive: true });
+  const video = path.join(outDir, "reel.mp4");
+  execFileSync("yt-dlp", ["--no-warnings", "-o", video, reelUrl], { stdio: "inherit" });
+  const dur = parseFloat(
+    execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video]).toString().trim()
+  );
+  const frames = [];
+  frameTimecodes(dur, n).forEach((t, i) => {
+    const f = path.join(outDir, `${i + 1}.jpg`);
+    execFileSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", video, "-frames:v", "1", "-vf", "scale=600:-1", "-q:v", "3", f, "-y"]);
+    frames.push(f);
+  });
+  const audio = path.join(outDir, "audio.m4a");
+  execFileSync("ffmpeg", ["-v", "error", "-i", video, "-vn", "-acodec", "copy", audio, "-y"]);
+  return { videoPath: video, audioPath: audio, frames, durationSec: dur };
+}
+
+// CLI: node extract-media.mjs <reelUrl> <outDir>
+if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  const [url, dir] = process.argv.slice(2);
+  console.log(JSON.stringify(extractMedia(url, dir), null, 2));
+}
