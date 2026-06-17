@@ -6,16 +6,21 @@ Find viral reels in your niche in instagram from the competitors you choose. Run
 
 ## Requirements
 
+`./install.sh` (below) installs and configures most of this for you. You only need these in place **first**:
+
 - **Claude Code** — the CLI ([install](https://docs.anthropic.com/en/docs/claude-code))
-- **chrome-devtools MCP** — drives the automation browser for Instagram scraping; add once:
-  ```
-  claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
-  ```
-- **yt-dlp** — `brew install yt-dlp` or `pip install yt-dlp`
-- **ffmpeg** — `brew install ffmpeg`
-- **Whisper** (optional, local transcription) — `pip install openai-whisper`
-- **GROQ_API_KEY** or **OPENAI_API_KEY** (optional) — cloud Whisper fallback for transcription
-- **nexlev MCP** (optional) — fallback enrichment when local media extraction fails
+- **Node 20+** — [nodejs.org](https://nodejs.org)
+- **Homebrew** (macOS only) — [brew.sh](https://brew.sh) — so the installer can add yt-dlp + ffmpeg
+
+The installer then sets up automatically:
+
+- **chrome-devtools MCP** — drives the automation browser for Instagram scraping (`claude mcp add chrome-devtools …`)
+- **yt-dlp** + **ffmpeg** — download reels and extract storyboard frames
+
+Optional (not installed automatically):
+
+- **Whisper** — local transcripts: `pip install openai-whisper` — or set **GROQ_API_KEY** / **OPENAI_API_KEY** for cloud transcription
+- **nexlev MCP** — fallback enrichment when local media extraction fails
 
 ---
 
@@ -25,7 +30,7 @@ Find viral reels in your niche in instagram from the competitors you choose. Run
 git clone https://github.com/thejmvai/claude-viral-radar && cd claude-viral-radar && ./install.sh
 ```
 
-Restart Claude Code after installing. The skills are picked up automatically from `~/.claude/skills/`.
+`install.sh` checks for and installs **yt-dlp** + **ffmpeg** (via Homebrew on macOS or apt on Linux), adds the **chrome-devtools MCP**, and copies both skills into `~/.claude/skills/`. It is safe to re-run and only installs what is missing. Restart Claude Code afterward so the skills and MCP load.
 
 ---
 
