@@ -76,7 +76,7 @@ viral-radar-out/
   report-latest.html          — always points to the latest report
 ```
 
-Open `report-latest.html` in Chrome and print to PDF for a shareable dossier.
+**The report is an interactive HTML page** — open `report-latest.html` in any browser to click through each reel's storyboard frames, expand transcripts, and copy them. PDF is optional: from the browser, **Print → Save as PDF**. The print layout lays out every reel's full frame filmstrip and auto-expands transcripts, so nothing is lost in the flat export.
 
 ---
 

@@ -109,7 +109,16 @@ const REPORT_CSS = `
 details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;background:var(--card-2)}details.tx summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:13px 16px}details.tx summary::-webkit-details-marker{display:none}.lft{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}.copybtn{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text);background:#27272F;border:1px solid var(--border);border-radius:7px;padding:5px 12px;cursor:pointer}.tx-body{font-size:14.5px;line-height:1.85;color:var(--muted);padding:0 16px 16px}
 .why{margin-top:22px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:14px;padding:16px 20px}.why .seclabel{color:var(--red)}.why p{margin:0;font-size:15px;line-height:1.7;color:#E7C9D0}
 .quarantine{margin-top:30px;border-top:1px solid var(--border);padding-top:18px}.qline{font-size:13px;color:var(--muted);margin-top:6px}.qline b{font-family:var(--mono);color:var(--fire)}
-@media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}`;
+@media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}
+/* Print / PDF export: show ALL storyboard frames as a filmstrip and expand transcripts */
+@media print{
+  .stage{aspect-ratio:auto;height:auto;background:transparent;display:flex;gap:4px}
+  .stage .frm{position:static;display:block;width:24%;height:auto;aspect-ratio:9/16;border-radius:7px}
+  .role,.ts,.nav,.fcount{display:none!important}
+  details.tx>*:not(summary){display:block!important}
+  details.tx summary .copybtn,details.tx summary .tri{display:none}
+  .reel{break-inside:avoid;page-break-inside:avoid}
+}`;
 
 // CLI: node render-report.mjs <dataset.json> <out.html>
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
