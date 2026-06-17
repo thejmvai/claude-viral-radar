@@ -12,21 +12,18 @@ const FIRE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-2 
 const CMT = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4V5a1 1 0 0 1 1-1z"/></svg>';
 
 function reelCard(r, framesBaseUrl, resolveFrame) {
-  const first = r.storyboard[0];
-  let frameSrc = "";
-  if (first) {
-    if (typeof resolveFrame === "function") {
-      frameSrc = resolveFrame(first.frame);
-    } else {
-      frameSrc = `${framesBaseUrl}${esc(first.frame)}`;
-    }
-  }
+  const sb = r.storyboard || [];
+  const frameUrl = (f) => (typeof resolveFrame === "function" ? resolveFrame(f.frame) : `${framesBaseUrl}${esc(f.frame)}`);
+  const frames = sb
+    .map((f, n) => `<img class="frm${n === 0 ? " on" : ""}" src="${frameUrl(f)}" data-role="${esc(f.role || "")}" data-ts="${esc(f.timestamp || "")}" data-cap="${esc(f.caption || "")}" alt="storyboard frame">`)
+    .join("");
+  const navBtns = sb.length > 1 ? `<button class="nav prev" aria-label="previous frame"></button><button class="nav next" aria-label="next frame"></button>` : "";
   return `
   <div class="reel">
     <div class="left">
       <div class="rank">#${r.rank}</div>
-      <div class="stage"><img src="${frameSrc}" alt="frame"><span class="fcount">1 / ${r.storyboard.length}</span></div>
-      <div class="cap"><b>${esc(first?.role || "")}</b> ${esc(first?.caption || "")}</div>
+      <div class="stage">${frames}<span class="role"></span><span class="ts"></span><span class="fcount">1 / ${sb.length || 1}</span>${navBtns}</div>
+      <div class="cap"><b class="cr"></b> <span class="cc"></span></div>
       <a class="igbtn" href="${esc(r.url)}" target="_blank" rel="noopener">Open on Instagram <span class="ic">&#8599;</span></a>
     </div>
     <div class="right">
@@ -66,7 +63,28 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
 ${cards}
 ${quar}
 </div>
-<script>document.querySelectorAll(".copybtn").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();navigator.clipboard.writeText(b.getAttribute("data-tx")||"");var t=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=t;},1500);});});</script>
+<script>
+document.querySelectorAll(".copybtn").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();navigator.clipboard.writeText(b.getAttribute("data-tx")||"");var t=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=t;},1500);});});
+document.querySelectorAll(".reel").forEach(function(reel){
+  var stage=reel.querySelector(".stage"); if(!stage) return;
+  var imgs=stage.querySelectorAll(".frm"); if(!imgs.length) return;
+  var roleEl=stage.querySelector(".role"), tsEl=stage.querySelector(".ts"), cntEl=stage.querySelector(".fcount");
+  var crEl=reel.querySelector(".cap .cr"), ccEl=reel.querySelector(".cap .cc"), i=0;
+  function show(n){ i=(n+imgs.length)%imgs.length;
+    imgs.forEach(function(im,k){im.classList.toggle("on",k===i);});
+    var a=imgs[i];
+    if(roleEl) roleEl.textContent=a.dataset.role||"";
+    if(tsEl) tsEl.textContent=a.dataset.ts||"";
+    if(cntEl) cntEl.textContent=(i+1)+" / "+imgs.length;
+    if(crEl) crEl.textContent=a.dataset.role||"";
+    if(ccEl) ccEl.textContent=a.dataset.cap||"";
+  }
+  var p=stage.querySelector(".nav.prev"), nx=stage.querySelector(".nav.next");
+  if(p) p.addEventListener("click",function(){show(i-1);});
+  if(nx) nx.addEventListener("click",function(){show(i+1);});
+  show(0);
+});
+</script>
 </body></html>`;
 }
 
@@ -78,8 +96,10 @@ const REPORT_CSS = `
 .plays{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.play b{display:block;font-family:var(--mono);color:var(--red);font-size:14px;margin-bottom:6px}.play span{font-size:14.5px}.gatenote{margin-top:18px;color:var(--muted);font-size:13.5px}
 .reel{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:30px 34px;display:grid;grid-template-columns:300px 1fr;gap:42px;align-items:start;margin-bottom:22px}
 .rank{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;color:#fff;background:linear-gradient(140deg,#FF9A5A,#FF4D6A);margin-bottom:16px}
-.stage{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:9/16;background:#000}.stage img{width:100%;height:100%;object-fit:cover;display:block}
-.fcount{position:absolute;right:10px;top:10px;font-family:var(--mono);font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:3px 9px;border-radius:8px}
+.stage{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:9/16;background:#000;user-select:none}.stage .frm{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}.stage .frm.on{display:block}
+.role{position:absolute;left:10px;top:10px;font-size:11px;font-weight:600;color:#fff;background:rgba(255,77,106,.92);padding:2px 9px;border-radius:7px;z-index:2}.ts{position:absolute;left:10px;bottom:10px;font-family:var(--mono);font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:2px 8px;border-radius:7px;z-index:2}
+.nav{position:absolute;top:0;height:100%;width:50%;border:0;background:transparent;cursor:pointer;z-index:3}.nav.prev{left:0}.nav.next{right:0}
+.fcount{position:absolute;right:10px;top:10px;font-family:var(--mono);font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:3px 9px;border-radius:8px;z-index:2}
 .cap{font-size:12px;color:var(--muted);text-align:center;margin-top:11px}.cap b{color:var(--red)}
 .igbtn{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;width:100%;background:var(--card-2);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 18px;font-size:13px;text-decoration:none}.igbtn .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 30% 107%,#fce6a4,#f06748 44%,#cc3d92 60%,#4a64d8 92%)}
 .who{display:flex;align-items:center;gap:12px;margin-bottom:16px}.who h2{font-size:24px;font-weight:600;margin:0}.pill-reel{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--red);border:1px solid var(--red-bd);background:var(--red-bg);border-radius:7px;padding:3px 9px}
