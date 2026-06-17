@@ -1,7 +1,9 @@
 #!/bin/sh
-# Viral Radar setup. Checks for and installs the dependencies, adds the
-# chrome-devtools MCP, and installs the two skills into ~/.claude/skills/.
-# Safe to re-run: it only installs what is missing.
+# Viral Radar setup. One-stop installer: checks/installs the dependencies, adds
+# the chrome-devtools MCP, and installs every skill the app needs into
+# ~/.claude/skills/ -- viral-radar + viral-competitor (this repo) and the
+# last30days trend skill (fetched from its upstream repo).
+# Safe to re-run: it only installs what is missing and always refreshes skills.
 
 say()  { printf "\n\033[1m%s\033[0m\n" "$1"; }
 ok()   { printf "  \033[32mok\033[0m   %s\n" "$1"; }
@@ -65,7 +67,7 @@ else
   printf '       claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest\n'
 fi
 
-# --- install the skills ------------------------------------------------------
+# --- install this repo's skills ----------------------------------------------
 say "Installing the skills..."
 DEST="${HOME}/.claude/skills"
 mkdir -p "$DEST"
@@ -73,7 +75,36 @@ cp -R skills/viral-radar "$DEST/" && cp -R skills/viral-competitor "$DEST/" \
   && ok "viral-radar + viral-competitor -> $DEST" \
   || warn "Could not copy skills into $DEST"
 
+# --- Python 3.12+ (required by the last30days trend skill) -------------------
+PYOK=""
+for py in python3.14 python3.13 python3.12 python3; do
+  if have "$py" && "$py" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' 2>/dev/null; then
+    PYOK="$py"; break
+  fi
+done
+if [ -n "$PYOK" ]; then ok "python ($PYOK) for last30days"; else
+  warn "Python 3.12+ not found (needed by last30days). Install it: https://www.python.org/downloads/"
+fi
+
+# --- last30days trend skill (fetched from upstream) --------------------------
+# Pulls the latest from github.com/mvanhorn/last30days-skill (MIT) so the radar
+# can research what a niche is talking about, not just scrape competitor reels.
+say "Installing the last30days trend skill (from upstream)..."
+if have git; then
+  L30_TMP="$(mktemp -d)"
+  if git clone --depth 1 https://github.com/mvanhorn/last30days-skill "$L30_TMP/last30days-skill" >/dev/null 2>&1; then
+    cp -R "$L30_TMP/last30days-skill/skills/last30days" "$DEST/" \
+      && ok "last30days -> $DEST" \
+      || warn "Could not copy last30days into $DEST"
+  else
+    warn "Could not fetch last30days (offline?). Install later: git clone https://github.com/mvanhorn/last30days-skill && cp -R last30days-skill/skills/last30days ~/.claude/skills/"
+  fi
+  rm -rf "$L30_TMP"
+else
+  warn "git not found — skipped last30days. Install git, then re-run ./install.sh"
+fi
+
 # --- optional ----------------------------------------------------------------
 have whisper && ok "whisper (transcripts)" || warn "Whisper not found (optional, for transcripts): pip install openai-whisper  — or set GROQ_API_KEY / OPENAI_API_KEY"
 
-say "Setup complete. Restart Claude Code, then run /viral-radar to log in and pick your niche."
+say "Setup complete. Restart Claude Code, then run /viral-radar to log in and pick your niche. Use /last30days <your niche> to see what the niche is talking about right now."

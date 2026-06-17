@@ -10,12 +10,14 @@ Find viral reels in your niche in instagram from the competitors you choose. Run
 
 - **Claude Code** — the CLI ([install](https://docs.anthropic.com/en/docs/claude-code))
 - **Node 20+** — [nodejs.org](https://nodejs.org)
+- **Python 3.12+** — [python.org](https://www.python.org/downloads/) — used by the last30days trend skill
 - **Homebrew** (macOS only) — [brew.sh](https://brew.sh) — so the installer can add yt-dlp + ffmpeg
 
 The installer then sets up automatically:
 
 - **chrome-devtools MCP** — drives the automation browser for Instagram scraping (`claude mcp add chrome-devtools …`)
 - **yt-dlp** + **ffmpeg** — download reels and extract storyboard frames
+- **last30days skill** — niche trend research, fetched from its [upstream repo](https://github.com/mvanhorn/last30days-skill)
 
 Optional (not installed automatically):
 
@@ -30,7 +32,7 @@ Optional (not installed automatically):
 git clone https://github.com/thejmvai/claude-viral-radar && cd claude-viral-radar && ./install.sh
 ```
 
-`install.sh` checks for and installs **yt-dlp** + **ffmpeg** (via Homebrew on macOS or apt on Linux), adds the **chrome-devtools MCP**, and copies both skills into `~/.claude/skills/`. It is safe to re-run and only installs what is missing. Restart Claude Code afterward so the skills and MCP load.
+`install.sh` is a one-stop installer: it checks for and installs **yt-dlp** + **ffmpeg** (via Homebrew on macOS or apt on Linux), adds the **chrome-devtools MCP**, and installs **all three skills** into `~/.claude/skills/` — **viral-radar** and **viral-competitor** from this repo, plus **last30days** (trend research) fetched from its [upstream repo](https://github.com/mvanhorn/last30days-skill). It is safe to re-run and only installs what is missing. Restart Claude Code afterward so the skills and MCP load.
 
 ---
 
@@ -59,6 +61,14 @@ Adds those handles to your tracker, immediately scrapes their reels, enriches th
 ```
 
 Scrapes all tracked handles and rebuilds the report with new viral reels since the last run.
+
+**4. See what your niche is talking about**
+
+```
+/last30days <your niche>
+```
+
+The bundled [last30days](https://github.com/mvanhorn/last30days-skill) skill researches the last 30 days across Reddit, YouTube, Hacker News, GitHub, and more. Pair *what your competitors posted* (Viral Radar) with *what the niche is actually discussing right now* (last30days) to pick your next topic. It runs keyless on Reddit, YouTube, Hacker News, and GitHub; X, TikTok, and Instagram unlock with optional API keys.
 
 ---
 
