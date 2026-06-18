@@ -143,12 +143,14 @@ Regenerate `nicheSynthesis` from the gate-passing reels:
 2. **Validate first:** run `node scripts/validate.mjs viral-radar-out/<niche>.config.json` and the dataset object (pipe JSON or write a temp file). If validation errors are returned, print them and **abort the write**.
 3. Write `viral-radar-out/<niche>.json` (overwrite).
 4. Update the seen-cache at `viral-radar-out/cache/<niche>-seen.json`: add each processed shortcode with `{ firstSeen: <ISO timestamp>, enriched: true }`.
-5. Render the HTML report:
+5. Render the HTML report into a **date-stamped archive folder** so every run is cataloged by date and old runs stay around to compare against:
    ```
-   node scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/report-<YYYY-MM-DD>.html
+   mkdir -p viral-radar-out/reports/<YYYY-MM-DD>
+   node scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html
+   cp viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/<niche>.json
    ```
-   Then copy it to `viral-radar-out/report-latest.html`.
-6. Tell the user: "Open `viral-radar-out/report-latest.html` in your browser, or print to PDF from Chrome for a shareable dossier."
+   Then copy the rendered report to `viral-radar-out/report-latest.html` (the always-newest pointer at the top level). If multiple runs happen on the same day, append a `-HHMM` suffix to the folder so earlier runs are not overwritten.
+6. Tell the user: "Open `viral-radar-out/report-latest.html` for the latest, or browse `viral-radar-out/reports/<date>/` for past runs. Print to PDF from Chrome for a shareable dossier."
 
 ---
 

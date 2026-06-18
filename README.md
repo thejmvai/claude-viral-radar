@@ -94,13 +94,16 @@ Everything lands in `viral-radar-out/` in your current working directory:
 
 ```
 viral-radar-out/
-  <niche>.config.json         — your niche config and tracked handles
-  <niche>.json                — full viral dataset (JSON)
-  cache/<niche>-seen.json     — dedup cache (auto-managed)
-  frames/<shortcode>/1-4.jpg  — storyboard frames
-  report-YYYY-MM-DD.html      — dated HTML report
-  report-latest.html          — always points to the latest report
+  <niche>.config.json              — your niche config and tracked handles
+  <niche>.json                     — full viral dataset (JSON)
+  cache/<niche>-seen.json          — dedup cache (auto-managed)
+  frames/<shortcode>/1-4.jpg       — storyboard frames
+  reports/<YYYY-MM-DD>/report.html — dated report, archived per run
+  reports/<YYYY-MM-DD>/<niche>.json— dataset snapshot for that run
+  report-latest.html               — always points to the latest report
 ```
+
+Each run is **cataloged by date** under `reports/<YYYY-MM-DD>/`, so past runs stay around to compare against. `report-latest.html` at the top level always points to the newest.
 
 **The report is an interactive HTML page** — open `report-latest.html` in any browser to click through each reel's storyboard frames, expand transcripts, and copy them. PDF is optional: from the browser, **Print → Save as PDF**. The print layout lays out every reel's full frame filmstrip and auto-expands transcripts, so nothing is lost in the flat export.
 

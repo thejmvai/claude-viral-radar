@@ -56,11 +56,13 @@ Run the full scrape and report workflow for the **newly added handles only** (no
 - Update `viral-radar-out/cache/<niche>-seen.json` with newly processed shortcodes.
 - Re-run synthesis over all gate-passing reels in the merged dataset.
 - Validate with `../viral-radar/scripts/validate.mjs` before writing.
-- Render and copy the report using `../viral-radar/scripts/render-report.mjs`:
+- Render the report into the date-stamped archive folder, then update the latest pointer:
   ```
-  node ../viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/report-<YYYY-MM-DD>.html
+  mkdir -p viral-radar-out/reports/<YYYY-MM-DD>
+  node ../viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html
+  cp viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/<niche>.json
   ```
-  Then copy to `viral-radar-out/report-latest.html`.
+  Then copy the rendered report to `viral-radar-out/report-latest.html`.
 
 ---
 
