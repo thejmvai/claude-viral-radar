@@ -36,7 +36,9 @@ git clone https://github.com/thejmvai/claude-viral-radar && cd claude-viral-rada
 
 ---
 
-## Usage
+## How to operate it
+
+The loop is **discover → track → scrape → rank → read.**
 
 **1. Set up (once)**
 
@@ -44,31 +46,45 @@ git clone https://github.com/thejmvai/claude-viral-radar && cd claude-viral-rada
 /viral-radar
 ```
 
-On first run, the skill checks your automation browser, walks you through a one-time Instagram login in the browser window, and asks what niche you're in. Takes about 2 minutes.
+On first run, the skill checks your automation browser, walks you through a one-time Instagram login in the browser window (stays local, never stored), and asks what niche you're in. Takes about 2 minutes.
 
-**2. Add competitors**
+**2. Add creators you already know**
 
 ```
 /viral-competitor @creator1 @creator2
 ```
 
-Adds those handles to your tracker, immediately scrapes their reels, enriches the viral ones with storyboard frames + transcript + structural analysis, and writes a fresh report.
+Adds those handles to your tracker, scrapes their reels, and enriches the viral ones with storyboard frames + transcript + a structural breakdown.
 
-**3. Refresh anytime**
+**3. Discover creators you don't know yet**
+
+```
+node skills/viral-radar/scripts/discover.mjs --niche=<niche>
+```
+
+Searches your niche hashtags via the [ScrapeCreators](https://app.scrapecreators.com) API and surfaces new creators blowing up that you *don't* track yet, ranked by reach + niche presence + recency. It prints a ready-to-paste `/viral-competitor` line — add the best and they join your watchlist. (Needs a free ScrapeCreators key and `discoveryEnabled: true`.)
+
+**4. Refresh anytime**
 
 ```
 /viral-radar
 ```
 
-Scrapes all tracked handles and rebuilds the report with new viral reels since the last run.
+Re-scrapes all tracked handles and rebuilds the report with new viral reels since the last run.
 
-**4. See what your niche is talking about**
+**5. See what your niche is talking about**
 
 ```
 /last30days <your niche>
 ```
 
-The bundled [last30days](https://github.com/mvanhorn/last30days-skill) skill researches the last 30 days across Reddit, YouTube, Hacker News, GitHub, and more. Pair *what your competitors posted* (Viral Radar) with *what the niche is actually discussing right now* (last30days) to pick your next topic. It runs keyless on Reddit, YouTube, Hacker News, and GitHub; X, TikTok, and Instagram unlock with optional API keys.
+The bundled [last30days](https://github.com/mvanhorn/last30days-skill) skill researches the last 30 days across Reddit, YouTube, Hacker News, GitHub, and more. Pair *what your competitors posted* (Viral Radar) with *what the niche is actually discussing right now* (last30days) to pick your next topic. Keyless on Reddit, YouTube, Hacker News, and GitHub; X, TikTok, and Instagram unlock with optional API keys.
+
+**What the radar decides for you**
+
+- Keeps **every** viral reel (≥5 per creator), never a curated handful.
+- Ranks by **recency-weighted signal** — fresh + high-engagement reels rise to the top.
+- **Quarantines "boosted" reels** (big views, weak like-rate) so paid-looking reach doesn't pollute your lessons.
 
 ---
 
