@@ -140,6 +140,7 @@ Regenerate `nicheSynthesis` from the gate-passing reels:
 ## Step 6 — Write outputs
 
 1. Build the full `ViralDataset` object: `{ niche, generatedAt, nicheSynthesis, reels, quarantined }`.
+   - **Optional cross-platform trends:** to add a "Hot across the niche" section below the reels, run `/last30days <niche>` (free sources suffice) and attach the top items as `crossPlatform: { window, summary, themes: [...], sources: [{ platform, icon, items: [{ title, url, metric }] }] }`. `render-report.mjs` renders it automatically when present — competitor reels above, niche-wide chatter (Reddit, TikTok, YouTube, GitHub) below.
 2. **Validate first:** run `node scripts/validate.mjs viral-radar-out/<niche>.config.json` and the dataset object (pipe JSON or write a temp file). If validation errors are returned, print them and **abort the write**.
 3. Write `viral-radar-out/<niche>.json` (overwrite).
 4. Update the seen-cache at `viral-radar-out/cache/<niche>-seen.json`: add each processed shortcode with `{ firstSeen: <ISO timestamp>, enriched: true }`.
