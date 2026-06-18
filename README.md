@@ -98,6 +98,16 @@ Each reel gets a **signal score** (0–100) combining engagement quality (like-r
 
 The report is a **full library, not a highlight reel.** Every gate-passing reel is kept — the funnel aims for **at least 5 per tracked channel** (`minPerHandle`), and no creator is trimmed to a single "best" pick. Reels are ordered by a **recency-weighted rank** that blends the signal score with **time of post**, so fresh, high-signal reels rise to the top. Tune the balance in your niche config: `recencyWeight` (0 = pure signal, 1 = pure recency; default 0.35) and `recencyHalfLifeDays` (default 30). Widen the catch with `scrapeTargetPerHandle` and `enrichmentCapPerRun`.
 
+## Discovery (find new creators)
+
+Tracked-handle scraping only watches creators you already listed. **Discovery** finds *new* ones: it searches your `seedHashtags` on Instagram via the [ScrapeCreators](https://app.scrapecreators.com) API, groups reels by creator, drops anyone you already track, and ranks the rest by reach + niche presence + recency.
+
+```
+node skills/viral-radar/scripts/discover.mjs --niche=<niche>
+```
+
+It writes `viral-radar-out/discovery-<niche>.json` and prints a ready-to-paste `/viral-competitor` line for the strongest finds. Enable it with `discoveryEnabled: true` plus a free `SCRAPECREATORS_API_KEY`. Discovery only *suggests* — you add the good ones with `/viral-competitor`.
+
 ---
 
 ## Privacy
