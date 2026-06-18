@@ -63,6 +63,26 @@ function reelCard(r, framesBaseUrl, resolveFrame) {
   </div>`;
 }
 
+// Optional "Hot across the niche" section: cross-platform trends gathered from
+// last30days (Reddit, TikTok, YouTube, GitHub, ...). Rendered only if ds.crossPlatform exists.
+function crossPlatformSection(ds) {
+  const cp = ds.crossPlatform;
+  if (!cp || !Array.isArray(cp.sources) || !cp.sources.length) return "";
+  const themes = (cp.themes || []).map((t) => `<li>${esc(t)}</li>`).join("");
+  const blocks = cp.sources.map((s) => {
+    const items = (s.items || []).map((it) =>
+      `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>${it.metric ? ` <span class="tmetric">${esc(it.metric)}</span>` : ""}</li>`).join("");
+    return `<div class="tsrc"><div class="tsrc-h">${esc(s.icon || "")} ${esc(s.platform)}</div><ul>${items}</ul></div>`;
+  }).join("");
+  return `<div class="trends">
+    <div class="thead"><h2>Hot across the niche</h2><span class="twin">${esc(cp.window || "last 30 days")}</span></div>
+    ${cp.summary ? `<div class="tsummary">${esc(cp.summary)}</div>` : ""}
+    ${themes ? `<div class="seclabel">What's trending</div><ul class="tthemes">${themes}</ul>` : ""}
+    <div class="tgrid">${blocks}</div>
+    <div class="tnote">Niche-wide chatter pulled from public platforms (competitor reels are above; this is what everyone else is talking about).</div>
+  </div>`;
+}
+
 export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
   const plays = ds.nicheSynthesis.whatsWorking.map((p, i) => `<div class="play"><b>0${i + 1}</b><span>${esc(p)}</span></div>`).join("");
   const cards = ds.reels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
@@ -78,6 +98,7 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
 <body><div class="wrap"><div class="pglabel">Viral Radar &middot; ${esc(ds.label || ds.niche)}</div><div class="pgsub">${sub}</div>
 <div class="synth"><h2>Top replicable plays</h2><div class="plays">${plays}</div><div class="gatenote">${esc(ds.nicheSynthesis.summary)}</div></div>
 ${cards}
+${crossPlatformSection(ds)}
 ${quar}
 </div>
 <script>
@@ -126,6 +147,17 @@ const REPORT_CSS = `
 details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;background:var(--card-2)}details.tx summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:13px 16px}details.tx summary::-webkit-details-marker{display:none}.lft{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}.copybtn{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text);background:#27272F;border:1px solid var(--border);border-radius:7px;padding:5px 12px;cursor:pointer}.tx-body{font-size:14.5px;line-height:1.85;color:var(--muted);padding:0 16px 16px}
 .why{margin-top:22px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:14px;padding:16px 20px}.why .seclabel{color:var(--red)}.why p{margin:0;font-size:15px;line-height:1.7;color:#E7C9D0}
 .quarantine{margin-top:30px;border-top:1px solid var(--border);padding-top:18px}.qline{font-size:13px;color:var(--muted);margin-top:6px}.qline b{font-family:var(--mono);color:var(--fire)}
+.trends{margin-top:44px;border-top:1px solid var(--border);padding-top:30px}
+.thead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}.thead h2{font-size:22px;font-weight:600;margin:0}.twin{font-family:var(--mono);font-size:12px;color:var(--faint)}
+.tsummary{color:var(--muted);font-size:14.5px;margin:8px 0 18px;line-height:1.7}
+.tthemes{margin:8px 0 24px;padding-left:18px}.tthemes li{margin:5px 0;font-size:14.5px}
+.tgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+.tsrc{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px}.tsrc-h{font-family:var(--mono);font-weight:600;font-size:12.5px;color:var(--red);margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em}
+.tsrc ul{margin:0;padding-left:16px}.tsrc li{margin:8px 0;font-size:14px;line-height:1.5}.tsrc a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border)}.tsrc a:hover{color:var(--red);border-color:var(--red-bd)}
+.tmetric{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.tnote{margin-top:18px;color:var(--faint);font-size:12.5px}
+@media(max-width:780px){.tgrid{grid-template-columns:1fr}}
+@media print{.tsrc{break-inside:avoid}.trends{break-inside:avoid}}
 @media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}
 /* Print / PDF export: show ALL storyboard frames as a filmstrip and expand transcripts */
 @media print{
