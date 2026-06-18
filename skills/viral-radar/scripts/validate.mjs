@@ -1,6 +1,6 @@
 const REEL_FIELDS = ["rank","shortcode","url","handle","creatorName","followers","discoveredVia","postedAt","ageHoursAtCatch","viralReason","metrics","likeRate","commentRate","ctaType","breakout","creatorMedianViews","reachMultiple","signalScore","qualityFlag","hook","hookDelivery","format","breakdown","whyItWorks","transcript","storyboard","enrichedAt","enrichmentEngine"];
 const METRIC_FIELDS = ["views","likes","comments","durationSec"];
-const CONFIG_FIELDS = ["niche","label","viralThreshold","velocityThreshold","velocityWindowHours","qualityGateLikeRate","seedHashtags","trackedHandles","discoveryEnabled","scrapeTargetPerHandle","minPerHandle","enrichmentCapPerRun","recencyWeight","recencyHalfLifeDays","updatedAt"];
+const CONFIG_FIELDS = ["niche","label","viralThreshold","velocityThreshold","velocityWindowHours","qualityGateLikeRate","seedHashtags","trackedHandles","discoveryEnabled","discoveryMinViews","scrapeTargetPerHandle","minPerHandle","enrichmentCapPerRun","recencyWeight","recencyHalfLifeDays","updatedAt"];
 
 export function validateConfig(cfg) {
   const errs = [];

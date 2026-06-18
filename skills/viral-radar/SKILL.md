@@ -74,6 +74,23 @@ For each handle in `config.trackedHandles`:
 
 ---
 
+## Step 2.5 — Discovery (find NEW creators to track)
+
+Tracked-handle scraping only ever sees creators you already listed. Discovery finds **new** ones by hashtag. Run it when `config.discoveryEnabled` is true and a `SCRAPECREATORS_API_KEY` is available (resolved from the env, `./.claude/last30days.env`, or `~/.config/last30days/.env`):
+
+```
+node scripts/discover.mjs --niche=<niche>
+```
+
+It searches `config.seedHashtags` on Instagram via the ScrapeCreators API, groups reels by creator, drops handles already in `config.trackedHandles` (and any already in the dataset), and ranks the rest by reach + niche presence + recency (reusing `recencyScore` from `scripts/score.mjs`). It writes:
+
+- `viral-radar-out/discovery-<niche>.json` — ranked new creators, each with their best reel, view counts, and profile URL.
+- A console summary plus a ready-to-paste `/viral-competitor @h1 @h2 ...` line for the strongest finds.
+
+Surface the top 5-8 suggestions to the user and let them pick. **Do not auto-add** discovered handles — discovery suggests, the user decides with `/viral-competitor`. If no `SCRAPECREATORS_API_KEY` is configured, skip this step (print a one-line note that discovery needs the free key from https://app.scrapecreators.com) and continue.
+
+---
+
 ## Step 3 — Tier 2 Enrichment
 
 Process only **new** work-list reels, capped at `config.enrichmentCapPerRun` (default 60). Order them so **every channel gets its floor first, then quality fills the rest**:
@@ -146,10 +163,10 @@ Print a `SUMMARY:` line with:
 
 ---
 
-## Scope notes (v1)
+## Scope notes
 
-- Hashtag discovery is **OFF** (`discoveryEnabled: false`). Only tracked handles are scraped.
-- `discoveryEnabled: true` is reserved for v2 once the tracked spine is validated.
+- **Tracked-handle scraping** (Step 2) is the spine: it runs via the chrome-devtools browser, no API key needed.
+- **Discovery** (Step 2.5) is optional and additive: it finds NEW creators by hashtag via the ScrapeCreators API. Enable with `discoveryEnabled: true` plus a `SCRAPECREATORS_API_KEY`. Discovery only *suggests* handles; the user adds the good ones with `/viral-competitor`.
 
 ---
 
@@ -159,4 +176,5 @@ Print a `SUMMARY:` line with:
 - **chrome-devtools MCP** — for Instagram scraping
 - **yt-dlp** + **ffmpeg** on PATH — for media extraction
 - **Whisper** (optional) — `pip install openai-whisper` — or set `GROQ_API_KEY` / `OPENAI_API_KEY` for cloud transcription
+- **ScrapeCreators API key** (optional) — powers Step 2.5 discovery; free tier at https://app.scrapecreators.com, set `SCRAPECREATORS_API_KEY`
 - **nexlev MCP** (optional) — fallback enrichment when local media extraction fails
