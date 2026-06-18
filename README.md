@@ -107,7 +107,7 @@ Each run is **cataloged by date** under `reports/<YYYY-MM-DD>/`, so past runs st
 
 **The report is an interactive HTML page** — open `report-latest.html` in any browser to click through each reel's storyboard frames, expand transcripts, and copy them. PDF is optional: from the browser, **Print → Save as PDF**. The print layout lays out every reel's full frame filmstrip and auto-expands transcripts, so nothing is lost in the flat export.
 
-When a `crossPlatform` block is attached to the dataset (e.g. from a `/last30days` run), the report also renders a **"Hot across the niche"** section below the reels — niche-wide chatter from Reddit, TikTok, YouTube, and GitHub alongside your competitor library.
+When a `crossPlatform` block is attached to the dataset (e.g. from a `/last30days` run), the report splits into two tabs — **Instagram Reels** (your competitor library) and **Others** (a "Hot across the niche" view: niche-wide chatter from Reddit, TikTok, YouTube, and GitHub). PDF export shows both.
 
 ---
 

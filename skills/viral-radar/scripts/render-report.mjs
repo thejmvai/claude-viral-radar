@@ -91,15 +91,22 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
     : "";
   const channels = new Set(ds.reels.map((r) => r.handle)).size;
   const sub = `${ds.reels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
+  const cp = ds.crossPlatform;
+  const hasCP = !!(cp && Array.isArray(cp.sources) && cp.sources.length);
+  const othersCount = hasCP ? cp.sources.reduce((s, x) => s + (x.items || []).length, 0) : 0;
+  const tabBar = hasCP
+    ? `<div class="tabs"><button class="tab on" data-tab="reels">&#128241; Instagram Reels <span class="tcount">${ds.reels.length}</span></button><button class="tab" data-tab="others">&#127760; Others <span class="tcount">${othersCount}</span></button></div>`
+    : "";
+  const mainBody = hasCP
+    ? `${tabBar}<div class="tabpanel" data-panel="reels">\n${cards}\n${quar}\n</div><div class="tabpanel hidden" data-panel="others">${crossPlatformSection(ds)}</div>`
+    : `${cards}\n${crossPlatformSection(ds)}\n${quar}`;
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Viral Radar — ${esc(ds.niche)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${REPORT_CSS}</style></head>
 <body><div class="wrap"><div class="pglabel">Viral Radar &middot; ${esc(ds.label || ds.niche)}</div><div class="pgsub">${sub}</div>
 <div class="synth"><h2>Top replicable plays</h2><div class="plays">${plays}</div><div class="gatenote">${esc(ds.nicheSynthesis.summary)}</div></div>
-${cards}
-${crossPlatformSection(ds)}
-${quar}
+${mainBody}
 </div>
 <script>
 document.querySelectorAll(".copybtn").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();navigator.clipboard.writeText(b.getAttribute("data-tx")||"");var t=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=t;},1500);});});
@@ -122,6 +129,7 @@ document.querySelectorAll(".reel").forEach(function(reel){
   if(nx) nx.addEventListener("click",function(){show(i+1);});
   show(0);
 });
+document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){var name=t.getAttribute("data-tab");document.querySelectorAll(".tab").forEach(function(x){x.classList.toggle("on",x===t);});document.querySelectorAll(".tabpanel").forEach(function(p){p.classList.toggle("hidden",p.getAttribute("data-panel")!==name);});});});
 </script>
 </body></html>`;
 }
@@ -158,6 +166,12 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 .tnote{margin-top:18px;color:var(--faint);font-size:12.5px}
 @media(max-width:780px){.tgrid{grid-template-columns:1fr}}
 @media print{.tsrc{break-inside:avoid}.trends{break-inside:avoid}}
+.tabs{display:flex;gap:6px;margin:4px 0 26px;border-bottom:1px solid var(--border)}
+.tab{appearance:none;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--sans);font-size:14px;font-weight:600;padding:10px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-bottom:-1px}
+.tab:hover{color:var(--text)}.tab.on{color:var(--text);border-bottom-color:var(--red)}
+.tab .tcount{font-family:var(--mono);font-size:11px;color:var(--faint);background:var(--card-2);border:1px solid var(--border);border-radius:7px;padding:1px 7px}.tab.on .tcount{color:var(--red);border-color:var(--red-bd)}
+.tabpanel.hidden{display:none}.trends{margin-top:8px;border-top:0;padding-top:0}
+@media print{.tabs{display:none}.tabpanel.hidden{display:block!important}.trends{margin-top:44px;border-top:1px solid var(--border);padding-top:30px}}
 @media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}
 /* Print / PDF export: show ALL storyboard frames as a filmstrip and expand transcripts */
 @media print{
