@@ -81,7 +81,7 @@ CDP scraper instead. Workflow SOP: `workflows/scrape-cdp.md`.
 
 1. Have the user launch Chrome with remote debugging **and logged into Instagram** (one-time per session;
    exact per-OS command is in `workflows/scrape-cdp.md` — macOS:
-   `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="$HOME/.viral-radar-chrome"`).
+   `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 "--remote-allow-origins=*" --user-data-dir="$HOME/.viral-radar-chrome"`).
 2. Run:
    ```
    node scripts/scrape-cdp.mjs --niche=<niche>

@@ -134,9 +134,10 @@ It writes `viral-radar-out/discovery-<niche>.json` and prints a ready-to-paste `
 The default Step 2 scrape drives a browser via the chrome-devtools MCP. If that MCP isn't installed or keeps disconnecting, run Step 2 with the **dependency-free CDP scraper** instead — it talks to a normal Chrome over the raw DevTools Protocol (Node's built-in `WebSocket` + `fetch`, no extra packages).
 
 ```
-# 1. Launch Chrome with remote debugging, logged into Instagram (macOS):
+# 1. Launch Chrome with remote debugging, logged into Instagram (macOS).
+#    Quote --remote-allow-origins=* so zsh/bash doesn't glob-expand the *:
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="$HOME/.viral-radar-chrome"
+  --remote-debugging-port=9222 "--remote-allow-origins=*" --user-data-dir="$HOME/.viral-radar-chrome"
 
 # 2. Scrape every tracked handle (writes viral-radar-out/worklist-<niche>.json):
 node skills/viral-radar/scripts/scrape-cdp.mjs --niche=<niche>

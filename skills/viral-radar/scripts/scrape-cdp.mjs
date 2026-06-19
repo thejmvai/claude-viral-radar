@@ -82,14 +82,22 @@ export const GRID_EXPR = `(() => {
   }
   return out;
 })()`;
-// 2. Exact follower count (title attr holds the unrounded number), text fallback
+// 2. Follower count. The profile og:description ("X Followers, Y Following, Z Posts") is the most
+// drift-resistant source; fall back to the followers anchor's title span, then a "<n> followers" scan.
+// Every branch requires a leading digit so a stray "." can't match.
 export const FOLLOWERS_EXPR = `(() => {
-  const a = document.querySelector('a[href$="/followers/"]') || document.querySelector('a[href*="/followers/"]');
+  const og = document.querySelector('meta[property="og:description"]');
+  if (og) { const m = (og.getAttribute('content') || '').match(/([\\d][\\d.,]*\\s*[KMkm]?)\\s+Followers/i); if (m) return m[1]; }
+  const a = [...document.querySelectorAll('a[href*="/followers/"]')][0];
   if (a) {
     const t = a.querySelector('span[title]');
-    if (t && t.getAttribute('title')) return t.getAttribute('title');
-    const txt = (a.textContent || '').match(/[\\d.,]+\\s*[KMkm]?/);
-    if (txt) return txt[0];
+    if (t && /\\d/.test(t.getAttribute('title') || '')) return t.getAttribute('title');
+    const m = (a.textContent || '').match(/[\\d][\\d.,]*\\s*[KMkm]?/);
+    if (m) return m[0];
+  }
+  for (const el of document.querySelectorAll('header span, main span, li span')) {
+    const m = (el.textContent || '').trim().match(/^([\\d][\\d.,]*\\s*[KMkm]?)\\s*followers$/i);
+    if (m) return m[1];
   }
   return '';
 })()`;
@@ -156,24 +164,36 @@ function arg(name, def = null) {
 
 async function scrapeHandle(cdp, handle, cfg, seen, now) {
   const h = normHandle(handle);
-  await cdp.navigate(`https://www.instagram.com/${h}/reels/`);
-  await wait(5000);
-
-  // Scroll until tiles stop growing or we hit the target.
   const target = Number(cfg.scrapeTargetPerHandle ?? 36);
+  // The grid is a SPA — tiles populate after navigation. It can also come back empty (header only)
+  // when Instagram throttles rapid requests, so reload + back off a few times before concluding
+  // a handle has no reels.
   let tiles = [];
-  for (let round = 0; round < 12; round++) {
+  for (let attempt = 0; attempt < 3 && tiles.length === 0; attempt++) {
+    await cdp.navigate(`https://www.instagram.com/${h}/reels/`);
+    await wait(6000 + attempt * 4000);
     tiles = (await cdp.evaluate(GRID_EXPR)) || [];
+    for (let r = 0; r < 5 && tiles.length === 0; r++) {
+      await wait(2000);
+      tiles = (await cdp.evaluate(GRID_EXPR)) || [];
+    }
+  }
+  // Scroll to load more, stopping at the target or once the grid stops growing
+  // (only treat "no growth" as done once we actually have tiles).
+  for (let round = 0; round < 15; round++) {
     if (tiles.length >= target) break;
     const before = tiles.length;
-    await cdp.evaluate("window.scrollBy(0, 2200)");
-    await wait(1800);
-    const after = ((await cdp.evaluate(GRID_EXPR)) || []).length;
-    if (after <= before) break; // no more loading
+    await cdp.evaluate("window.scrollBy(0, 2400)");
+    await wait(2200);
+    const next = (await cdp.evaluate(GRID_EXPR)) || [];
+    if (next.length <= before && before > 0) break;
+    tiles = next;
   }
-  tiles = (await cdp.evaluate(GRID_EXPR)) || [];
 
   const followers = parseCount(await cdp.evaluate(FOLLOWERS_EXPR)) || null;
+  // Header rendered (followers found) but grid empty => Instagram is withholding the grid (throttle),
+  // NOT a creator with zero reels. Surface it so a run isn't silently treated as "no hits".
+  const throttled = tiles.length === 0 && followers != null;
   const creatorMedianViews = median(tiles.map((t) => parseCount(t.viewsText)));
 
   const reels = [];
@@ -189,8 +209,9 @@ async function scrapeHandle(cdp, handle, cfg, seen, now) {
     reels.push(buildWorklistItem({
       shortcode: cand.shortcode, views: cand.views, og, handle: h, followers, creatorMedianViews, viralReason: reason, now,
     }));
+    await wait(1500); // pace reel fetches
   }
-  return { handle: `@${h}`, followers, gridSize: tiles.length, reels };
+  return { handle: `@${h}`, followers, gridSize: tiles.length, throttled, reels };
 }
 
 async function main() {
@@ -225,15 +246,18 @@ async function main() {
   await cdp.send("Runtime.enable");
 
   const now = new Date();
+  const gapMs = Number(arg("gap", 4000)); // pacing between handles — Instagram throttles bursts
   const perHandle = [];
   const allReels = [];
-  for (const handle of handles) {
+  for (let i = 0; i < handles.length; i++) {
+    const handle = handles[i];
+    if (i > 0) await wait(gapMs);
     process.stdout.write(`  @${normHandle(handle)} … `);
     try {
       const r = await scrapeHandle(cdp, handle, cfg, seen, now);
-      perHandle.push({ handle: r.handle, kept: r.reels.length, gridSize: r.gridSize, followers: r.followers });
+      perHandle.push({ handle: r.handle, kept: r.reels.length, gridSize: r.gridSize, followers: r.followers, throttled: r.throttled });
       allReels.push(...r.reels);
-      console.log(`${r.reels.length} new viral / ${r.gridSize} tiles`);
+      console.log(`${r.reels.length} new viral / ${r.gridSize} tiles${r.throttled ? " (throttled: header only)" : ""}`);
     } catch (e) {
       perHandle.push({ handle: `@${normHandle(handle)}`, kept: 0, error: String(e.message || e) });
       console.log(`error: ${e.message || e}`);
@@ -243,14 +267,16 @@ async function main() {
 
   const minPerHandle = Number(cfg.minPerHandle ?? 5);
   const underFloor = perHandle.filter((p) => p.kept < minPerHandle).map((p) => p.handle);
+  const throttledHandles = perHandle.filter((p) => p.throttled).map((p) => p.handle);
   const out = arg("out", path.join(outDir, `worklist-${niche}.json`));
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(out, JSON.stringify({
-    niche, source: "cdp", scrapedAt: now.toISOString(), minPerHandle, perHandle, underFloor, reels: allReels,
+    niche, source: "cdp", scrapedAt: now.toISOString(), minPerHandle, perHandle, underFloor, throttledHandles, reels: allReels,
   }, null, 2));
 
   console.log(`\nWork-list: ${allReels.length} new viral reels across ${handles.length} handles → ${out}`);
   if (underFloor.length) console.log(`Under ${minPerHandle}/handle: ${underFloor.join(", ")}`);
+  if (throttledHandles.length) console.log(`⚠ ${throttledHandles.length} handle(s) returned header-only (Instagram throttling). Re-run later / increase --gap. Affected: ${throttledHandles.join(", ")}`);
   console.log("Next: feed this work-list into Step 3 enrichment (the agent reads it and continues the pipeline).");
 }
 

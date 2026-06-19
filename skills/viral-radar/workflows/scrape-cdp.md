@@ -17,9 +17,11 @@ alternatives (browser scraping gets fragile engagement; IG often hides like coun
 Close Chrome fully, then relaunch it logged into Instagram with the debug port open:
 
 - **macOS:**
-  `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="$HOME/.viral-radar-chrome"`
-- **Linux:** `google-chrome --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="$HOME/.viral-radar-chrome"`
+  `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 "--remote-allow-origins=*" --user-data-dir="$HOME/.viral-radar-chrome"`
+- **Linux:** `google-chrome --remote-debugging-port=9222 "--remote-allow-origins=*" --user-data-dir="$HOME/.viral-radar-chrome"`
 - **Windows:** `"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="%USERPROFILE%\.viral-radar-chrome"`
+
+(zsh/bash: quote `"--remote-allow-origins=*"` so the shell doesn't glob-expand the `*`.)
 
 Then log into Instagram in that window. (`--remote-allow-origins=*` is required on Chrome ≥111 or the
 DevTools WebSocket refuses connections. The dedicated `--user-data-dir` keeps a stable logged-in profile
@@ -59,6 +61,16 @@ If a selector breaks, fix it here and note the working selector + date below.
   debug window, then re-run.
 - **Velocity-band reels** (`[velocityThreshold, viralThreshold)`) need `postedAt` for the age rule, so the
   tool fetches og for every candidate at/above `velocityThreshold` before classifying with `isViral`.
+- **Throttling — the real operational risk (learned from live testing 2026-06-19).** After a burst of
+  rapid requests (≈10+ in a couple of minutes), Instagram serves the **profile header only** — the reels
+  grid never renders, so `og:description`/followers still parse but the grid is empty. This reads as
+  "0 reels" when it's really a soft-block. The tool guards against it: it polls + reloads for the grid,
+  paces handles (`--gap`, default 4000ms) and reel fetches, and flags `throttled` per handle (`header
+  loaded but grid empty`) in the work-list + a `⚠` summary line. **For the full tracked list (27 handles)
+  this matters a lot** — keep `--gap` generous, and if many handles come back `throttled`, stop and re-run
+  later (the cooldown is minutes+). The very first request of a fresh session reliably returns the full grid.
+- **Quoting `--remote-allow-origins=*`:** in zsh the `*` must be quoted (`"--remote-allow-origins=*"`) or
+  the shell glob-expands it and Chrome never gets the flag.
 - **Raw CDP proves fiddly?** Fallback documented: `npm i chrome-remote-interface` + a `package.json` in the
   skill. Prefer staying dependency-free.
 
