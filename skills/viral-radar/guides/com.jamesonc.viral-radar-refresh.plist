@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd template for the scheduled Viral Radar refresh (macOS).
+  Replace every __PLACEHOLDER__, then install per guides/setup-scheduled-refresh.md.
+    __NODE__        absolute path to node            (e.g. /usr/local/bin/node)
+    __REFRESH_MJS__ absolute path to refresh.mjs     (…/.claude/skills/viral-radar/scripts/refresh.mjs)
+    __PROJECT_DIR__ folder that holds viral-radar-out (your project root)
+    __NPM_BIN__     dir holding the `claude` binary   (e.g. /Users/you/.npm-global/bin)
+  Schedule below = daily at 07:00. Change Hour/Minute, or swap to an interval.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jamesonc.viral-radar-refresh</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__REFRESH_MJS__</string>
+    <string>--niche=ai-claude</string>
+    <string>--project-dir=__PROJECT_DIR__</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_DIR__</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>__NPM_BIN__:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>7</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>__PROJECT_DIR__/viral-radar-out/refresh.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_DIR__/viral-radar-out/refresh.log</string>
+</dict>
+</plist>
