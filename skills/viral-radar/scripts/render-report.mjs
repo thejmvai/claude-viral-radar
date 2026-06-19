@@ -2,6 +2,12 @@ import fs from "node:fs";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n).toLocaleString("en-US");
+const compactNum = (n) => {
+  const v = Number(n) || 0;
+  if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(v >= 1e5 ? 0 : 1).replace(/\.0$/, "") + "K";
+  return String(v);
+};
 
 // Human "x days ago" label from a postedAt date, relative to `now`.
 function ageLabel(postedAt, now = new Date()) {
@@ -32,6 +38,11 @@ function reelCard(r, framesBaseUrl, resolveFrame) {
     .map((f, n) => `<img class="frm${n === 0 ? " on" : ""}" src="${frameUrl(f)}" data-role="${esc(f.role || "")}" data-ts="${esc(f.timestamp || "")}" data-cap="${esc(f.caption || "")}" alt="storyboard frame">`)
     .join("");
   const navBtns = sb.length > 1 ? `<button class="nav prev" aria-label="previous frame"></button><button class="nav next" aria-label="next frame"></button>` : "";
+  // 0/1/2s hook frames (the literal first seconds), shown above the hook line when captured.
+  const hf = r.hookFrames || [];
+  const hookStrip = hf.length
+    ? `<div class="hookframes">${hf.slice(0, 3).map((f, i) => `<figure><img src="${frameUrl({ frame: f })}" alt="first ${i}s"><figcaption>${i}s</figcaption></figure>`).join("")}</div>`
+    : "";
   return `
   <div class="reel">
     <div class="left">
@@ -54,7 +65,7 @@ function reelCard(r, framesBaseUrl, resolveFrame) {
         <span><b>${(r.likeRate * 100).toFixed(1)}%</b> like-rate <span class="organic">${r.ctaType === "organic" ? "organic" : "CTA-gated"}</span></span>
         <span><b>${(r.commentRate * 100).toFixed(1)}%</b> comment-rate</span>
       </div>
-      <div class="sec"><div class="seclabel">Hook &middot; ${esc(r.hookDelivery.replace("+", " + "))}</div><div class="hook">&ldquo;${esc(r.hook)}&rdquo;</div></div>
+      <div class="sec"><div class="seclabel">Hook &middot; ${esc(r.hookDelivery.replace("+", " + "))}</div>${hookStrip}<div class="hook">&ldquo;${esc(r.hook)}&rdquo;</div></div>
       <div class="sec"><div class="seclabel">Format</div><span class="ftag">${esc(r.format)}</span></div>
       <div class="sec"><div class="seclabel">Breakdown</div><div class="breakdown">${esc(r.breakdown)}</div></div>
       <details class="tx"><summary><span class="lft"><span class="tri">&#9656;</span> Transcript</span><button class="copybtn" data-tx="${esc(r.transcript)}">Copy</button></summary><div class="tx-body">${esc(r.transcript).replace(/\n/g, "<br>")}</div></details>
@@ -83,6 +94,27 @@ function crossPlatformSection(ds) {
   </div>`;
 }
 
+// At-a-glance stat row above the tabs: reels, gate-pass %, channels, top views, discovered, transcribed.
+function statBar(ds) {
+  const reels = ds.reels || [];
+  const quar = ds.quarantined || [];
+  const caught = reels.length + quar.length;
+  const pct = caught ? Math.round((100 * reels.length) / caught) : 100;
+  const channels = new Set(reels.map((r) => r.handle)).size;
+  const topViews = reels.reduce((m, r) => Math.max(m, (r.metrics && r.metrics.views) || 0), 0);
+  const discovered = reels.filter((r) => r.discoveredVia === "discovery").length;
+  const transcribed = reels.filter((r) => r.transcript && String(r.transcript).trim()).length;
+  const cell = (n, l) => `<div class="stat"><div class="statn">${n}</div><div class="statl">${l}</div></div>`;
+  return `<div class="statbar">${[
+    cell(fmt(reels.length), "reels"),
+    cell(`${pct}%`, "passed gate"),
+    cell(fmt(channels), "channels"),
+    cell(compactNum(topViews), "top views"),
+    cell(fmt(discovered), "discovered"),
+    cell(fmt(transcribed), "transcribed"),
+  ].join("")}</div>`;
+}
+
 export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
   const plays = ds.nicheSynthesis.whatsWorking.map((p, i) => `<div class="play"><b>0${i + 1}</b><span>${esc(p)}</span></div>`).join("");
   const cards = ds.reels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
@@ -105,6 +137,7 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>${REPORT_CSS}</style></head>
 <body><div class="wrap"><div class="pglabel">Viral Radar &middot; ${esc(ds.label || ds.niche)}</div><div class="pgsub">${sub}</div>
+${statBar(ds)}
 <div class="synth"><h2>Top replicable plays</h2><div class="plays">${plays}</div><div class="gatenote">${esc(ds.nicheSynthesis.summary)}</div></div>
 ${mainBody}
 </div>
@@ -138,6 +171,9 @@ const REPORT_CSS = `
 :root{--bg:#0C0C10;--card:#141419;--card-2:#1C1C23;--border:#2A2A33;--text:#F3F3F6;--muted:#9A9AA4;--faint:#6C6C77;--red:#FF4D6A;--red-bg:rgba(255,77,106,.12);--red-bd:rgba(255,77,106,.38);--fire:#FF7A3C;--heart:#FF5A7A;--amber:#F0B73E;--green:#46C178;--sans:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6}
 .wrap{max-width:1120px;margin:0 auto;padding:46px 40px 90px}.pglabel{font-size:12px;font-weight:600;letter-spacing:.05em;color:var(--red);text-transform:uppercase;margin-bottom:6px}.pgsub{font-family:var(--mono);font-size:12px;color:var(--faint);margin-bottom:24px}
+.statbar{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:0 0 30px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 22px}
+.stat{text-align:center}.statn{font-family:var(--mono);font-size:23px;font-weight:700;color:var(--text);line-height:1.1}.statl{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-top:5px}
+.hookframes{display:flex;gap:8px;margin:0 0 14px}.hookframes figure{margin:0;flex:1}.hookframes img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:9px;border:1px solid var(--border);display:block}.hookframes figcaption{font-family:var(--mono);font-size:10px;color:var(--faint);text-align:center;margin-top:4px}
 .synth{margin-bottom:30px}.synth h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:0 0 14px}
 .plays{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.play b{display:block;font-family:var(--mono);color:var(--red);font-size:14px;margin-bottom:6px}.play span{font-size:14.5px}.gatenote{margin-top:18px;color:var(--muted);font-size:13.5px}
 .reel{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:30px 34px;display:grid;grid-template-columns:300px 1fr;gap:42px;align-items:start;margin-bottom:22px}
@@ -164,7 +200,7 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 .tsrc ul{margin:0;padding-left:16px}.tsrc li{margin:8px 0;font-size:14px;line-height:1.5}.tsrc a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border)}.tsrc a:hover{color:var(--red);border-color:var(--red-bd)}
 .tmetric{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
 .tnote{margin-top:18px;color:var(--faint);font-size:12.5px}
-@media(max-width:780px){.tgrid{grid-template-columns:1fr}}
+@media(max-width:780px){.tgrid{grid-template-columns:1fr}.statbar{grid-template-columns:repeat(3,1fr);gap:16px}}
 @media print{.tsrc{break-inside:avoid}.trends{break-inside:avoid}}
 .tabs{display:flex;gap:6px;margin:4px 0 26px;border-bottom:1px solid var(--border)}
 .tab{appearance:none;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--sans);font-size:14px;font-weight:600;padding:10px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-bottom:-1px}

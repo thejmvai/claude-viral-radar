@@ -15,6 +15,7 @@ const ds = {
     hook: "This is a demo viral hook", hookDelivery: "spoken+text", format: "Talking-head demo",
     breakdown: "b", whyItWorks: "the demo reveal holds attention", transcript: "line one\nline two",
     storyboard: [{ timestamp: "0:03", role: "Hook", caption: "c", frame: "frames/Demo123XYZ/1.jpg" }],
+    hookFrames: ["frames/Demo123XYZ/hook-0.jpg", "frames/Demo123XYZ/hook-1.jpg", "frames/Demo123XYZ/hook-2.jpg"],
     enrichedAt: "x", enrichmentEngine: "local",
   }],
   quarantined: [],
@@ -32,6 +33,31 @@ test("renders a standalone dark dossier with the key sections", () => {
   assert.match(html, /Why it worked/i);
   assert.match(html, /Transcript/i);
   assert.match(html, /instagram\.com\/reel\/Demo123XYZ/);
+});
+
+test("renders the at-a-glance stat-bar", () => {
+  const html = renderReport(ds, { framesBaseUrl: "" });
+  assert.match(html, /class="statbar"/);
+  assert.match(html, /passed gate/);
+  assert.match(html, /top views/);
+  assert.match(html, /transcribed/);
+  assert.match(html, /1M/);      // top views compacted (1,000,000 -> 1M)
+  assert.match(html, /100%/);    // 1 reel, 0 quarantined -> 100% passed gate
+});
+
+test("renders 0/1/2s hook frames when present", () => {
+  const html = renderReport(ds, { framesBaseUrl: "" });
+  assert.match(html, /class="hookframes"/);
+  assert.match(html, /frames\/Demo123XYZ\/hook-0\.jpg/);
+  assert.match(html, /<figcaption>0s<\/figcaption>/);
+  assert.match(html, /<figcaption>2s<\/figcaption>/);
+});
+
+test("omits hook frames when a reel has none", () => {
+  const noHook = JSON.parse(JSON.stringify(ds));
+  delete noHook.reels[0].hookFrames;
+  const html = renderReport(noHook, { framesBaseUrl: "" });
+  assert.doesNotMatch(html, /class="hookframes"/);
 });
 
 test("escapes html in user content", () => {

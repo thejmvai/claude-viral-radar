@@ -129,7 +129,7 @@ Enrich reels in that combined order (floor reels first).
 
 For each reel:
 
-1. **Download media:** run `node scripts/extract-media.mjs <reelUrl> viral-radar-out/frames/<shortcode>`. This writes `1.jpg`–`4.jpg` (storyboard frames) and `audio.m4a`.
+1. **Download media:** run `node scripts/extract-media.mjs <reelUrl> viral-radar-out/frames/<shortcode>`. This writes `1.jpg`–`4.jpg` (storyboard frames), `hook-0.jpg`/`hook-1.jpg`/`hook-2.jpg` (the literal first 0/1/2 seconds, for sharper hook study), and `audio.m4a`. Record the hook frames on the reel as `hookFrames: ["frames/<shortcode>/hook-0.jpg", ...]` (relative to `viral-radar-out/`) — the report shows them as a filmstrip in the Hook section.
 2. **Transcribe audio:** if `whisper` is available on PATH, run `whisper viral-radar-out/frames/<shortcode>/audio.m4a --model base.en --output_format txt`. Read the `.txt` output. Alternatively, if a `GROQ_API_KEY` or `OPENAI_API_KEY` environment variable is set, use the respective Whisper API endpoint.
 3. **Analyze frames with Claude vision:** read the 4 `.jpg` frames and ask Claude to produce:
    - `storyboard`: array of `{ timestamp, role, caption }` for each frame (role = Hook / Proof / CTA / etc., caption = what's happening on screen + any on-screen text)
@@ -141,7 +141,7 @@ For each reel:
    - `breakdown`: 2–3 sentence structural analysis
    - `whyItWorks`: 1–2 sentence strategic insight
 5. **Fallback:** if `extract-media.mjs` fails (yt-dlp/ffmpeg not available or download error) OR transcription fails: call the nexlev MCP `watch_instagram_video_and_ask` with the reel URL and ask the same questions (storyboard captions, format, hook, hookDelivery, ctaType, breakdown, whyItWorks). Set `enrichmentEngine: "nexlev"`. If `watch_instagram_video_and_ask` also fails, store a partial record (fill unknown fields with `""`) and continue to the next reel.
-6. Build the complete `ViralReel` object. Set `storyboard[n].frame` to `frames/<shortcode>/<n+1>.jpg` (relative to `viral-radar-out/`).
+6. Build the complete `ViralReel` object. Set `storyboard[n].frame` to `frames/<shortcode>/<n+1>.jpg` and `hookFrames` to the `frames/<shortcode>/hook-*.jpg` paths (both relative to `viral-radar-out/`).
 
 ---
 

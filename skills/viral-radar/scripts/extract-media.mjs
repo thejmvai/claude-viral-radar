@@ -8,7 +8,14 @@ export function frameTimecodes(durationSec, n = 4) {
   return pcts.map((p) => Math.max(1, +(p * durationSec).toFixed(2)));
 }
 
-// Download a reel and extract n frames + audio. Returns { videoPath, audioPath, frames: [paths], durationSec }.
+// Literal first-seconds for hook study (0s/1s/2s), clamped to the clip length.
+// Always includes 0; later seconds only if they fall inside the clip.
+export function hookFrameTimecodes(durationSec, secs = [0, 1, 2]) {
+  return secs.filter((t) => t === 0 || t < durationSec);
+}
+
+// Download a reel and extract storyboard frames + 0/1/2s hook frames + audio.
+// Returns { videoPath, audioPath, frames: [paths], hookFrames: [paths], durationSec }.
 export function extractMedia(reelUrl, outDir, n = 4) {
   fs.mkdirSync(outDir, { recursive: true });
   const video = path.join(outDir, "reel.mp4");
@@ -16,15 +23,24 @@ export function extractMedia(reelUrl, outDir, n = 4) {
   const dur = parseFloat(
     execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video]).toString().trim()
   );
+  const grab = (t, f) =>
+    execFileSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", video, "-frames:v", "1", "-vf", "scale=600:-1", "-q:v", "3", f, "-y"]);
   const frames = [];
   frameTimecodes(dur, n).forEach((t, i) => {
     const f = path.join(outDir, `${i + 1}.jpg`);
-    execFileSync("ffmpeg", ["-v", "error", "-ss", String(t), "-i", video, "-frames:v", "1", "-vf", "scale=600:-1", "-q:v", "3", f, "-y"]);
+    grab(t, f);
     frames.push(f);
+  });
+  // First 0/1/2 seconds — the literal hook, for sharper hook study.
+  const hookFrames = [];
+  hookFrameTimecodes(dur).forEach((t) => {
+    const f = path.join(outDir, `hook-${t}.jpg`);
+    grab(t, f);
+    hookFrames.push(f);
   });
   const audio = path.join(outDir, "audio.m4a");
   execFileSync("ffmpeg", ["-v", "error", "-i", video, "-vn", "-acodec", "copy", audio, "-y"]);
-  return { videoPath: video, audioPath: audio, frames, durationSec: dur };
+  return { videoPath: video, audioPath: audio, frames, hookFrames, durationSec: dur };
 }
 
 // CLI: node extract-media.mjs <reelUrl> <outDir>
