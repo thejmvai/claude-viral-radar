@@ -164,6 +164,21 @@ Print a `SUMMARY:` line with:
 - **Per-channel coverage**: reels kept per handle, and call out any handle that came in under `config.minPerHandle`
 - The top 3 by `rankScore` (handle + rankScore + postedAt)
 
+### Step 7.5 — Telegram digest (optional)
+
+Push the run digest to the user's phone. Workflow SOP: `workflows/telegram-digest.md`.
+
+```
+node scripts/notify-telegram.mjs --niche=<niche>
+```
+
+- If `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` resolve (env, `./.claude/viral-radar.env`, or
+  `~/.config/viral-radar/.env`), it delivers the digest (top reels by rank, per-channel coverage, top "Hot
+  across the niche" items) to Telegram. On success it prints `Telegram digest sent (message_id …)`.
+- If no credentials are found, it just prints the digest and exits cleanly — **never fails the run.** Tell
+  the user once that they can set it up via `guides/setup-telegram.md` to get it on their phone.
+- Use `--dry-run` to preview the digest without sending.
+
 ---
 
 ## Scope notes

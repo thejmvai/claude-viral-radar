@@ -2,3 +2,8 @@ viral-radar-out/
 node_modules/
 *.log
 .DS_Store
+
+# Secrets — never commit. `.env.example` is the safe template (not matched by *.env).
+.env
+*.env
+.claude/*.env
