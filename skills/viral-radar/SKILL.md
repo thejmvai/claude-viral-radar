@@ -74,6 +74,32 @@ For each handle in `config.trackedHandles`:
 
 ---
 
+## Step 2 (no MCP) — raw CDP scraper (alternative to the MCP path above)
+
+If the chrome-devtools MCP is unavailable or keeps disconnecting, run Step 2 with the dependency-free
+CDP scraper instead. Workflow SOP: `workflows/scrape-cdp.md`.
+
+1. Have the user launch Chrome with remote debugging **and logged into Instagram** (one-time per session;
+   exact per-OS command is in `workflows/scrape-cdp.md` — macOS:
+   `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="$HOME/.viral-radar-chrome"`).
+2. Run:
+   ```
+   node scripts/scrape-cdp.mjs --niche=<niche>
+   ```
+   It iterates `config.trackedHandles`, opens each `/<handle>/reels/`, scrolls to `scrapeTargetPerHandle`,
+   scrapes shortcodes + view counts, reads the follower count, fetches each viral candidate's
+   `og:description` for exact likes/comments/postedAt, applies the same viral gate (`isViral`) and metrics
+   (`score.mjs`), and writes the **work-list** to `viral-radar-out/worklist-<niche>.json`.
+3. Read `worklist-<niche>.json` and treat its `reels` array as the **work-list** for the rest of the
+   pipeline — its item shape matches what the MCP Step 2 produced inline, so **continue at Step 3
+   enrichment unchanged.**
+
+This removes the MCP dependency and is the spine for unattended/scheduled refreshes. Browser scraping
+still gets fragile engagement (IG hides like counts), so ScrapeCreators/Apify remain the high-fidelity
+alternatives.
+
+---
+
 ## Step 2.5 — Discovery (find NEW creators to track)
 
 Tracked-handle scraping only ever sees creators you already listed. Discovery finds **new** ones by hashtag. Run it when `config.discoveryEnabled` is true and a `SCRAPECREATORS_API_KEY` is available (resolved from the env, `./.claude/last30days.env`, or `~/.config/last30days/.env`):
@@ -191,7 +217,7 @@ node scripts/notify-telegram.mjs --niche=<niche>
 ## Requirements
 
 - **Claude Code** (this skill is invoked via `/viral-radar`)
-- **chrome-devtools MCP** — for Instagram scraping
+- **chrome-devtools MCP** — for Instagram scraping (Step 2). Or skip it: use **Step 2 (no MCP)** with `scripts/scrape-cdp.mjs` + a Chrome launched on `--remote-debugging-port=9222` (dependency-free, no MCP).
 - **yt-dlp** + **ffmpeg** on PATH — for media extraction
 - **Whisper** (optional) — `pip install openai-whisper` — or set `GROQ_API_KEY` / `OPENAI_API_KEY` for cloud transcription
 - **ScrapeCreators API key** (optional) — powers Step 2.5 discovery; free tier at https://app.scrapecreators.com, set `SCRAPECREATORS_API_KEY`

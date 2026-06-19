@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseOgDescription, decodeEntities } from "./parse-og.mjs";
+import { parseOgDescription, decodeEntities, parseCount } from "./parse-og.mjs";
+
+test("parseCount parses K/M/commas case-insensitively", () => {
+  assert.equal(parseCount("1.2M"), 1200000);
+  assert.equal(parseCount("847k"), 847000);
+  assert.equal(parseCount("1,234 views"), 1234);
+  assert.equal(parseCount("500K views"), 500000);
+  assert.equal(parseCount(""), 0);
+  assert.equal(parseCount(null), 0);
+});
 
 test("decodeEntities handles IG entity encodings", () => {
   assert.equal(decodeEntities("don&#039;t &amp; &quot;x&quot; &#x2014; &#064;h"), 'don\'t & "x" — @h');

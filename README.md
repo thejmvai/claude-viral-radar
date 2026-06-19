@@ -129,6 +129,21 @@ node skills/viral-radar/scripts/discover.mjs --niche=<niche>
 
 It writes `viral-radar-out/discovery-<niche>.json` and prints a ready-to-paste `/viral-competitor` line for the strongest finds. Enable it with `discoveryEnabled: true` plus a free `SCRAPECREATORS_API_KEY`. Discovery only *suggests* — you add the good ones with `/viral-competitor`.
 
+## Scraping without the MCP (raw CDP)
+
+The default Step 2 scrape drives a browser via the chrome-devtools MCP. If that MCP isn't installed or keeps disconnecting, run Step 2 with the **dependency-free CDP scraper** instead — it talks to a normal Chrome over the raw DevTools Protocol (Node's built-in `WebSocket` + `fetch`, no extra packages).
+
+```
+# 1. Launch Chrome with remote debugging, logged into Instagram (macOS):
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="$HOME/.viral-radar-chrome"
+
+# 2. Scrape every tracked handle (writes viral-radar-out/worklist-<niche>.json):
+node skills/viral-radar/scripts/scrape-cdp.mjs --niche=<niche>
+```
+
+It scrapes each handle's `/reels/` grid, reads follower counts, pulls exact likes/comments/postedAt from each viral candidate's `og:description`, scores them, and emits a work-list the enrichment step picks up unchanged. Per-OS launch commands and troubleshooting: [`skills/viral-radar/workflows/scrape-cdp.md`](skills/viral-radar/workflows/scrape-cdp.md). Browser scraping still gets fragile engagement (IG hides like counts), so ScrapeCreators/Apify remain the high-fidelity options.
+
 ## Telegram digest (optional)
 
 Get a digest pushed to your phone after every run instead of opening the HTML file. It sends the top reels by rank (tappable to the reel), per-channel coverage, and the top "Hot across the niche" items.

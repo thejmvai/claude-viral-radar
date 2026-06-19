@@ -23,6 +23,9 @@ function toNum(s) {
   return Math.round(n);
 }
 
+// Shared count parser for "1.2M", "847k", "1,234 views", etc. (case-insensitive). Reused by scrape-cdp.
+export const parseCount = (s) => toNum(String(s ?? "").toUpperCase());
+
 // "<likes> likes, <comments> comments - <handle> on <Month D, YYYY>: \"<caption>\". "
 export function parseOgDescription(og) {
   const decoded = og || "";
