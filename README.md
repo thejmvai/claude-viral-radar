@@ -129,6 +129,17 @@ node skills/viral-radar/scripts/discover.mjs --niche=<niche>
 
 It writes `viral-radar-out/discovery-<niche>.json` and prints a ready-to-paste `/viral-competitor` line for the strongest finds. Enable it with `discoveryEnabled: true` plus a free `SCRAPECREATORS_API_KEY`. Discovery only *suggests* — you add the good ones with `/viral-competitor`.
 
+## Telegram digest (optional)
+
+Get a digest pushed to your phone after every run instead of opening the HTML file. It sends the top reels by rank (tappable to the reel), per-channel coverage, and the top "Hot across the niche" items.
+
+```
+node skills/viral-radar/scripts/notify-telegram.mjs --niche=<niche>            # send
+node skills/viral-radar/scripts/notify-telegram.mjs --niche=<niche> --dry-run  # preview only
+```
+
+One-time setup (~3 min): create a bot with **@BotFather**, grab your chat id, and put `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `.claude/viral-radar.env` (gitignored). Full walkthrough: [`skills/viral-radar/guides/setup-telegram.md`](skills/viral-radar/guides/setup-telegram.md). No credentials = it just prints the digest and the run continues; it never blocks a run.
+
 ---
 
 ## Privacy
