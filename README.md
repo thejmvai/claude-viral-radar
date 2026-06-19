@@ -156,6 +156,17 @@ node skills/viral-radar/scripts/notify-telegram.mjs --niche=<niche> --dry-run  #
 
 One-time setup (~3 min): create a bot with **@BotFather**, grab your chat id, and put `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `.claude/viral-radar.env` (gitignored). Full walkthrough: [`skills/viral-radar/guides/setup-telegram.md`](skills/viral-radar/guides/setup-telegram.md). No credentials = it just prints the digest and the run continues; it never blocks a run.
 
+## Scheduled auto-refresh (macOS)
+
+Run the whole pipeline on a schedule and wake up to a fresh digest — no manual step. A launchd job runs `scripts/refresh.mjs`, which ensures the debug Chrome is up, runs the full `/viral-radar` headless via `claude -p` (scrape → enrich → rank → render → digest), and alerts you on Telegram if anything fails.
+
+```
+# Prove it works by hand first:
+node skills/viral-radar/scripts/refresh.mjs --niche=<niche> --project-dir="$PWD"
+```
+
+Then fill the launchd template [`skills/viral-radar/guides/com.jamesonc.viral-radar-refresh.plist`](skills/viral-radar/guides/com.jamesonc.viral-radar-refresh.plist) and load it. Full walkthrough: [`skills/viral-radar/guides/setup-scheduled-refresh.md`](skills/viral-radar/guides/setup-scheduled-refresh.md). **Cost:** the enrichment step uses Claude each run (your plan's usage, or API dollars); scraping + Telegram are free.
+
 ---
 
 ## Privacy
