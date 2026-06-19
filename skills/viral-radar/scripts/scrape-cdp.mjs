@@ -1,0 +1,259 @@
+// MCP-free scraper: Step 2 detection over the raw Chrome DevTools Protocol, no chrome-devtools MCP
+// (which disconnects mid-session). Dependency-free — Node's global WebSocket + fetch. Scrapes each
+// tracked handle's /reels/ grid, fetches each viral candidate's og:description for exact engagement,
+// computes preliminary metrics with score.mjs, and writes a work-list the enrichment step consumes.
+// See workflows/scrape-cdp.md (incl. the Chrome --remote-debugging-port launch command).
+//
+// CLI: node scripts/scrape-cdp.mjs [--niche=ai-claude] [--port=9222] [--target=36]
+//        [--handles=a,b] [--out=<path>]
+import fs from "node:fs";
+import path from "node:path";
+import { parseOgDescription, parseCount } from "./parse-og.mjs";
+import {
+  likeRate, commentRate, breakout, reachMultiple, qualityFlag, signalScore, isViral, ageHoursFrom,
+} from "./score.mjs";
+
+export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const normHandle = (h) => String(h || "").trim().replace(/^@/, "").toLowerCase();
+
+// --- raw CDP client (dependency-free) ----------------------------------------
+export async function listTargets(port = 9222, fetchImpl = fetch) {
+  const res = await fetchImpl(`http://127.0.0.1:${port}/json/list`);
+  return res.json();
+}
+
+// Pick a usable page target, preferring one already on instagram.com.
+export function pickPageTarget(targets, urlIncludes = "instagram.com") {
+  const pages = (targets || []).filter((t) => t.type === "page" && t.webSocketDebuggerUrl);
+  return pages.find((t) => (t.url || "").includes(urlIncludes)) || pages[0] || null;
+}
+
+export class CdpClient {
+  constructor(ws) {
+    this.ws = ws;
+    this._id = 0;
+    this._pending = new Map();
+    this.ws.addEventListener("message", (ev) => this._onMessage(ev));
+  }
+  static async connect(wsUrl, { WebSocketImpl = WebSocket } = {}) {
+    const ws = new WebSocketImpl(wsUrl);
+    await new Promise((resolve, reject) => {
+      ws.addEventListener("open", () => resolve(), { once: true });
+      ws.addEventListener("error", (e) => reject(new Error("CDP WebSocket error: " + (e && e.message || "failed to connect"))), { once: true });
+    });
+    return new CdpClient(ws);
+  }
+  _onMessage(ev) {
+    let msg;
+    try { msg = JSON.parse(typeof ev.data === "string" ? ev.data : String(ev.data)); } catch { return; }
+    if (msg.id && this._pending.has(msg.id)) {
+      const { resolve, reject } = this._pending.get(msg.id);
+      this._pending.delete(msg.id);
+      if (msg.error) reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+      else resolve(msg.result);
+    }
+  }
+  send(method, params = {}) {
+    const id = ++this._id;
+    return new Promise((resolve, reject) => {
+      this._pending.set(id, { resolve, reject });
+      this.ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+  async evaluate(expression, { awaitPromise = false } = {}) {
+    const r = await this.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise });
+    if (r && r.exceptionDetails) throw new Error("evaluate failed: " + (r.exceptionDetails.text || "exception"));
+    return r && r.result ? r.result.value : undefined;
+  }
+  async navigate(url) { return this.send("Page.navigate", { url }); }
+  close() { try { this.ws.close(); } catch {} }
+}
+
+// --- browser-evaluated DOM reads (LIVE-GATED — selectors drift, validate on real IG) --------
+// 1. Reel grid tiles -> [{ shortcode, viewsText }]
+export const GRID_EXPR = `(() => {
+  const out = [], seen = new Set();
+  for (const a of document.querySelectorAll('a[href*="/reel/"]')) {
+    const m = (a.getAttribute('href') || '').match(/\\/reel\\/([\\w-]+)/);
+    if (!m || seen.has(m[1])) continue;
+    seen.add(m[1]);
+    const nums = (a.textContent || '').match(/[\\d.,]+\\s*[KMkm]?/g) || [];
+    out.push({ shortcode: m[1], viewsText: nums.length ? nums[nums.length - 1].trim() : '' });
+  }
+  return out;
+})()`;
+// 2. Exact follower count (title attr holds the unrounded number), text fallback
+export const FOLLOWERS_EXPR = `(() => {
+  const a = document.querySelector('a[href$="/followers/"]') || document.querySelector('a[href*="/followers/"]');
+  if (a) {
+    const t = a.querySelector('span[title]');
+    if (t && t.getAttribute('title')) return t.getAttribute('title');
+    const txt = (a.textContent || '').match(/[\\d.,]+\\s*[KMkm]?/);
+    if (txt) return txt[0];
+  }
+  return '';
+})()`;
+// 3. og:description on a reel page (server-rendered, reliable)
+export const OG_EXPR = `(() => { const m = document.querySelector('meta[property="og:description"]'); return m ? m.getAttribute('content') : ''; })()`;
+
+// --- pure helpers (unit-tested) ----------------------------------------------
+export function median(nums) {
+  const a = (nums || []).filter((n) => Number.isFinite(n) && n > 0).sort((x, y) => x - y);
+  if (!a.length) return 0;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
+}
+
+// A grid tile + its og data -> a work-list reel (same pre-enrichment shape Step 2 produced inline).
+export function buildWorklistItem({ shortcode, views, og = {}, handle, followers, creatorMedianViews, viralReason, now = new Date() }) {
+  const likes = og.likes || 0;
+  const comments = og.comments || 0;
+  const postedAt = og.postedAt || null;
+  const lr = likeRate(likes, views);
+  const cr = commentRate(comments, views);
+  const bo = breakout(views, creatorMedianViews);
+  return {
+    shortcode,
+    url: `https://www.instagram.com/reel/${shortcode}/`,
+    handle: handle.startsWith("@") ? handle : `@${handle}`,
+    creatorName: "",
+    followers: followers ?? null,
+    discoveredVia: "tracked",
+    postedAt,
+    ageHoursAtCatch: Math.round(ageHoursFrom(postedAt, now)),
+    viralReason,
+    metrics: { views, likes, comments },
+    likeRate: +lr.toFixed(5),
+    commentRate: +cr.toFixed(5),
+    breakout: +bo.toFixed(2),
+    creatorMedianViews,
+    reachMultiple: followers ? +reachMultiple(views, followers).toFixed(2) : null,
+    signalScore: signalScore({ likeRate: lr, commentRate: cr, ctaType: "", breakout: bo, followers: followers || 0 }),
+    qualityFlag: qualityFlag(lr),
+  };
+}
+
+// Which grid tiles even need an og fetch: views at/above the velocity floor.
+export function candidateTiles(tiles, cfg) {
+  return (tiles || [])
+    .map((t) => ({ shortcode: t.shortcode, views: parseCount(t.viewsText) }))
+    .filter((t) => t.shortcode && t.views >= (cfg.velocityThreshold ?? 50000));
+}
+
+// Final viral decision (reuses score.isViral) given views + age, returns reason or null.
+export function viralReasonFor({ views, ageHours }, cfg) {
+  if (views >= cfg.viralThreshold) return "absolute";
+  if (isViral({ views, ageHours }, cfg)) return "velocity";
+  return null;
+}
+
+// --- CLI ---------------------------------------------------------------------
+function arg(name, def = null) {
+  const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
+  if (hit) return hit.split("=").slice(1).join("=");
+  return process.argv.includes(`--${name}`) ? true : def;
+}
+
+async function scrapeHandle(cdp, handle, cfg, seen, now) {
+  const h = normHandle(handle);
+  await cdp.navigate(`https://www.instagram.com/${h}/reels/`);
+  await wait(5000);
+
+  // Scroll until tiles stop growing or we hit the target.
+  const target = Number(cfg.scrapeTargetPerHandle ?? 36);
+  let tiles = [];
+  for (let round = 0; round < 12; round++) {
+    tiles = (await cdp.evaluate(GRID_EXPR)) || [];
+    if (tiles.length >= target) break;
+    const before = tiles.length;
+    await cdp.evaluate("window.scrollBy(0, 2200)");
+    await wait(1800);
+    const after = ((await cdp.evaluate(GRID_EXPR)) || []).length;
+    if (after <= before) break; // no more loading
+  }
+  tiles = (await cdp.evaluate(GRID_EXPR)) || [];
+
+  const followers = parseCount(await cdp.evaluate(FOLLOWERS_EXPR)) || null;
+  const creatorMedianViews = median(tiles.map((t) => parseCount(t.viewsText)));
+
+  const reels = [];
+  for (const cand of candidateTiles(tiles, cfg)) {
+    if (seen[cand.shortcode]) continue; // already processed in a past run
+    // og:description gives exact likes/comments/postedAt (+ enables the velocity age rule)
+    await cdp.navigate(`https://www.instagram.com/reel/${cand.shortcode}/`);
+    await wait(2500);
+    const og = parseOgDescription(await cdp.evaluate(OG_EXPR));
+    const ageHours = ageHoursFrom(og.postedAt, now);
+    const reason = viralReasonFor({ views: cand.views, ageHours }, cfg);
+    if (!reason) continue;
+    reels.push(buildWorklistItem({
+      shortcode: cand.shortcode, views: cand.views, og, handle: h, followers, creatorMedianViews, viralReason: reason, now,
+    }));
+  }
+  return { handle: `@${h}`, followers, gridSize: tiles.length, reels };
+}
+
+async function main() {
+  const outDir = "viral-radar-out";
+  let niche = arg("niche");
+  if (!niche) {
+    const cfgs = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter((f) => f.endsWith(".config.json")) : [];
+    niche = cfgs[0] ? cfgs[0].replace(".config.json", "") : "ai-claude";
+  }
+  const cfgPath = path.join(outDir, `${niche}.config.json`);
+  if (!fs.existsSync(cfgPath)) { console.error(`No config at ${cfgPath}.`); process.exit(1); }
+  const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+
+  let handles = (arg("handles") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!handles.length) handles = cfg.trackedHandles || [];
+  if (!handles.length) { console.error("No trackedHandles. Add some with /viral-competitor."); process.exit(1); }
+
+  const seenPath = path.join(outDir, "cache", `${niche}-seen.json`);
+  let seen = {};
+  try { seen = JSON.parse(fs.readFileSync(seenPath, "utf8")); } catch {}
+
+  const port = Number(arg("port", 9222));
+  let targets;
+  try { targets = await listTargets(port); } catch {
+    console.error(`\nCannot reach Chrome on :${port}. Launch it with --remote-debugging-port=${port} --remote-allow-origins=* and log into Instagram. See workflows/scrape-cdp.md.\n`);
+    process.exit(1);
+  }
+  const target = pickPageTarget(targets);
+  if (!target) { console.error("No usable Chrome page target found."); process.exit(1); }
+  const cdp = await CdpClient.connect(target.webSocketDebuggerUrl);
+  await cdp.send("Page.enable");
+  await cdp.send("Runtime.enable");
+
+  const now = new Date();
+  const perHandle = [];
+  const allReels = [];
+  for (const handle of handles) {
+    process.stdout.write(`  @${normHandle(handle)} … `);
+    try {
+      const r = await scrapeHandle(cdp, handle, cfg, seen, now);
+      perHandle.push({ handle: r.handle, kept: r.reels.length, gridSize: r.gridSize, followers: r.followers });
+      allReels.push(...r.reels);
+      console.log(`${r.reels.length} new viral / ${r.gridSize} tiles`);
+    } catch (e) {
+      perHandle.push({ handle: `@${normHandle(handle)}`, kept: 0, error: String(e.message || e) });
+      console.log(`error: ${e.message || e}`);
+    }
+  }
+  cdp.close();
+
+  const minPerHandle = Number(cfg.minPerHandle ?? 5);
+  const underFloor = perHandle.filter((p) => p.kept < minPerHandle).map((p) => p.handle);
+  const out = arg("out", path.join(outDir, `worklist-${niche}.json`));
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(out, JSON.stringify({
+    niche, source: "cdp", scrapedAt: now.toISOString(), minPerHandle, perHandle, underFloor, reels: allReels,
+  }, null, 2));
+
+  console.log(`\nWork-list: ${allReels.length} new viral reels across ${handles.length} handles → ${out}`);
+  if (underFloor.length) console.log(`Under ${minPerHandle}/handle: ${underFloor.join(", ")}`);
+  console.log("Next: feed this work-list into Step 3 enrichment (the agent reads it and continues the pipeline).");
+}
+
+if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  main().catch((e) => { console.error(String(e.message || e)); process.exit(1); });
+}
