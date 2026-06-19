@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { frameTimecodes } from "./extract-media.mjs";
+import { frameTimecodes, hookFrameTimecodes } from "./extract-media.mjs";
 
 test("frameTimecodes spaces 4 frames across the clip", () => {
   const t = frameTimecodes(67, 4);
@@ -8,4 +8,10 @@ test("frameTimecodes spaces 4 frames across the clip", () => {
   assert.ok(t[0] >= 2 && t[0] < t[1] && t[3] < 67);
   // monotonic
   for (let i = 1; i < t.length; i++) assert.ok(t[i] > t[i - 1]);
+});
+
+test("hookFrameTimecodes returns 0/1/2s clamped to the clip length", () => {
+  assert.deepEqual(hookFrameTimecodes(67), [0, 1, 2]);
+  assert.deepEqual(hookFrameTimecodes(1.5), [0, 1]); // 2s falls outside a 1.5s clip
+  assert.deepEqual(hookFrameTimecodes(0.5), [0]);     // 0 is always included
 });
