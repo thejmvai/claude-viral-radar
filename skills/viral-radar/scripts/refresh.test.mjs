@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chromeLaunchArgv, claudeRefreshPrompt, claudeArgv, chromeReachable } from "./refresh.mjs";
+import { chromeLaunchArgv, scrapeArgv, claudeEnrichPrompt, claudeArgv, chromeReachable } from "./refresh.mjs";
 
 test("chromeLaunchArgv has the debug port, allowed origins, profile, and start url", () => {
   const argv = chromeLaunchArgv("/tmp/prof", 9222);
@@ -12,13 +12,23 @@ test("chromeLaunchArgv has the debug port, allowed origins, profile, and start u
   ]);
 });
 
-test("claudeRefreshPrompt names the niche and forces the no-MCP path + full pipeline", () => {
-  const p = claudeRefreshPrompt("ai-claude");
+test("scrapeArgv passes niche + out, and handles only when given", () => {
+  assert.deepEqual(scrapeArgv("ai-claude", "viral-radar-out/worklist-ai-claude.json"), [
+    "--niche=ai-claude", "--out=viral-radar-out/worklist-ai-claude.json",
+  ]);
+  assert.deepEqual(scrapeArgv("ai-claude", "w.json", "a,b"), [
+    "--niche=ai-claude", "--out=w.json", "--handles=a,b",
+  ]);
+});
+
+test("claudeEnrichPrompt references the work-list, forbids re-scraping, and forbids backgrounding", () => {
+  const p = claudeEnrichPrompt("ai-claude", "viral-radar-out/worklist-ai-claude.json");
   assert.match(p, /\/viral-radar/);
-  assert.match(p, /ai-claude/);
-  assert.match(p, /no MCP|no-MCP|scrape-cdp\.mjs/);
+  assert.match(p, /worklist-ai-claude\.json/);
+  assert.match(p, /do NOT scrape again/i);
+  assert.match(p, /will NOT be re-invoked/i);
+  assert.match(p, /Do NOT background/i);
   assert.match(p, /digest/i);
-  assert.match(p, /Do not ask for confirmation/i);
 });
 
 test("claudeArgv adds print + skip-permissions, and model when given", () => {

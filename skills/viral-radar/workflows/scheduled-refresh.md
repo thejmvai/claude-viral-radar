@@ -8,21 +8,27 @@ On a schedule (default daily), run the **full** Viral Radar pipeline and push th
 manual step. "Full" means real enrichment (Claude vision writes hooks/storyboards/why-it-works on new
 reels), so it uses Claude usage each run.
 
-## How it works
-`refresh.mjs` is a thin orchestrator (run by launchd):
+## How it works (two steps — this split is load-bearing)
+`refresh.mjs` is the orchestrator (run by launchd):
 1. **Ensure Chrome** is up on `:9222` with the persisted, logged-in profile (`$HOME/.viral-radar-chrome`);
    launch it if not, wait until the DevTools endpoint answers.
-2. **Run the pipeline headless:** `claude -p "<refresh prompt>" --dangerously-skip-permissions` from the
-   project dir. The prompt tells the skill to run a full `/viral-radar` using the **Step 2 (no MCP) CDP
-   scraper** (the chrome-devtools MCP isn't loaded headless), then enrich → rank → render → **digest**
-   (Step 7.5 sends it). The skill does all the work; `refresh.mjs` just drives it.
-3. **Alert on failure:** if Chrome can't be reached or `claude` exits non-zero, send a Telegram alert
-   (reusing `notify-telegram.mjs`) so a silent failure doesn't go unnoticed.
+2. **Scrape deterministically:** run `scrape-cdp.mjs` as a plain subprocess (awaited) → `worklist-<niche>.json`.
+3. **Bounded agent work:** `claude -p "<enrich prompt>" --dangerously-skip-permissions` from the project
+   dir. The prompt hands the agent the **already-scraped work-list** and tells it to do only Steps 3–7.5
+   (enrich → merge → rank → synthesize → render → **digest**). It must NOT scrape again.
+4. **Alert on failure:** if Chrome is unreachable, the scrape fails, or `claude` exits non-zero, send a
+   Telegram alert (reusing `notify-telegram.mjs`) so a silent failure doesn't go unnoticed.
+
+**Why the scrape is NOT delegated to the agent (learned 2026-06-20 live test):** a headless `claude -p`
+agent treats the long 27-handle scrape like an interactive background task — it backgrounds it and ends
+its turn expecting to be re-invoked, but `-p` mode just exits, leaving the pipeline unfinished (no digest).
+Owning the scrape as a plain subprocess removes that judgment call; the agent only gets bounded work, and
+the prompt still hard-forbids backgrounding for the enrichment step.
 
 ## Tool
 ```
 node scripts/refresh.mjs [--niche=ai-claude] [--port=9222] [--project-dir=<cwd>]
-   [--profile=$HOME/.viral-radar-chrome] [--model=<id>] [--no-launch-chrome]
+   [--handles=a,b] [--profile=$HOME/.viral-radar-chrome] [--model=<id>] [--no-launch-chrome]
 ```
 Run by the launchd job `com.jamesonc.viral-radar-refresh` (template in `guides/`).
 

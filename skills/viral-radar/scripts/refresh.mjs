@@ -1,16 +1,22 @@
-// Scheduled auto-refresh (Full): ensure the debug Chrome is up, run the full /viral-radar pipeline
-// headless via `claude -p`, and alert on Telegram if it fails. Driven by a launchd job (see
-// guides/setup-scheduled-refresh.md). The skill itself sends the digest (Step 7.5). See
-// workflows/scheduled-refresh.md.
+// Scheduled auto-refresh (Full): ensure the debug Chrome is up, SCRAPE deterministically (so the long
+// step can't be backgrounded), then run only the bounded agent work (enrich -> rank -> render -> digest)
+// via `claude -p`. Alerts on Telegram if anything fails. Driven by a launchd job (see
+// guides/setup-scheduled-refresh.md). See workflows/scheduled-refresh.md.
+//
+// Why two steps: a headless `claude -p` agent will background a long scrape and exit (it expects to be
+// re-invoked, which never happens in print mode), leaving the pipeline unfinished. So refresh.mjs owns the
+// scrape as a plain subprocess and hands the agent a ready work-list.
 //
 // CLI: node scripts/refresh.mjs [--niche=ai-claude] [--port=9222] [--project-dir=<cwd>]
-//        [--profile=$HOME/.viral-radar-chrome] [--model=<id>] [--no-launch-chrome]
+//        [--handles=a,b] [--profile=$HOME/.viral-radar-chrome] [--model=<id>] [--no-launch-chrome]
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { resolveTelegramCreds, sendTelegramMessage } from "./notify-telegram.mjs";
 
 const DEFAULT_CHROME_MAC = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 // --- pure helpers (unit-tested) ----------------------------------------------
 export function chromeLaunchArgv(profileDir, port = 9222, startUrl = "https://www.instagram.com/") {
@@ -22,13 +28,24 @@ export function chromeLaunchArgv(profileDir, port = 9222, startUrl = "https://ww
   ];
 }
 
-// The headless prompt: full refresh via the no-MCP CDP scraper (MCP isn't loaded under `claude -p`).
-export function claudeRefreshPrompt(niche) {
+export function scrapeArgv(niche, outPath, handles = "") {
+  const a = [`--niche=${niche}`, `--out=${outPath}`];
+  if (handles) a.push(`--handles=${handles}`);
+  return a;
+}
+
+// The headless prompt: ONLY the bounded agent work, from an already-scraped work-list. The hard rule
+// against backgrounding is load-bearing — without it the agent defers long steps and exits early.
+export function claudeEnrichPrompt(niche, worklistPath) {
   return (
-    `/viral-radar run a full refresh for niche "${niche}". The chrome-devtools MCP is NOT available, ` +
-    `so use the "Step 2 (no MCP)" path with scripts/scrape-cdp.mjs for detection (Chrome is already ` +
-    `running on :9222 logged into Instagram). Then run enrichment, ranking, report render, and send the ` +
-    `Telegram digest (Step 7.5) as normal. Do not ask for confirmation; complete the whole pipeline.`
+    `/viral-radar continue the pipeline for niche "${niche}" from the already-scraped work-list at ` +
+    `${worklistPath} (its "reels" array is the Step 2 output — do NOT scrape again). Run Step 3 enrichment ` +
+    `on each new reel (download media, transcribe, vision-analyze frames, set hookFrames), merge with the ` +
+    `existing viral-radar-out/${niche}.json, then Step 4 ranking, Step 5 synthesis, Step 6 write + render ` +
+    `the report, and Step 7.5 send the Telegram digest. ` +
+    `CRITICAL: you are headless (claude -p) and will NOT be re-invoked. Run every command synchronously in ` +
+    `the foreground and WAIT for each to finish. Do NOT background, defer, or hand off any step. Complete ` +
+    `the entire pipeline before ending your response.`
   );
 }
 
@@ -75,11 +92,12 @@ async function ensureChrome(port, profile, chromeBin) {
   return false;
 }
 
-function runClaude(claudeBin, argv, cwd) {
+// Run a subprocess to completion (stdout/stderr inherited). Resolves with the exit code.
+function run(bin, argv, cwd) {
   return new Promise((resolve) => {
-    const child = spawn(claudeBin, argv, { cwd, stdio: ["ignore", "inherit", "inherit"] });
+    const child = spawn(bin, argv, { cwd, stdio: ["ignore", "inherit", "inherit"] });
     child.on("exit", (code) => resolve(code ?? 1));
-    child.on("error", (e) => { console.error("spawn claude failed:", e.message); resolve(127); });
+    child.on("error", (e) => { console.error(`spawn ${bin} failed:`, e.message); resolve(127); });
   });
 }
 
@@ -87,12 +105,14 @@ async function main() {
   const niche = arg("niche", "ai-claude");
   const port = Number(arg("port", 9222));
   const projectDir = arg("project-dir", process.cwd());
+  const handles = arg("handles", "");
   const profile = arg("profile", path.join(os.homedir(), ".viral-radar-chrome"));
   const model = arg("model", "");
   const chromeBin = arg("chrome-bin", process.env.CHROME_BIN || DEFAULT_CHROME_MAC);
   const claudeBin = arg("claude-bin", process.env.CLAUDE_BIN || "claude");
+  const worklistRel = path.join("viral-radar-out", `worklist-${niche}.json`);
 
-  console.log(`[refresh] niche=${niche} port=${port} dir=${projectDir}`);
+  console.log(`[refresh] niche=${niche} port=${port} dir=${projectDir}${handles ? ` handles=${handles}` : ""}`);
 
   if (arg("no-launch-chrome") !== true) {
     const up = await ensureChrome(port, profile, chromeBin);
@@ -103,10 +123,19 @@ async function main() {
     }
   }
 
-  const argv = claudeArgv(claudeRefreshPrompt(niche), { model });
-  console.log(`[refresh] running: ${claudeBin} ${argv.slice(0, 2).join(" ")} …`);
-  const code = await runClaude(claudeBin, argv, projectDir);
+  // Step 2 — scrape deterministically (plain subprocess; cannot be backgrounded by an agent).
+  console.log("[refresh] scraping (CDP)…");
+  const scrapeCode = await run(process.execPath, [path.join(SCRIPT_DIR, "scrape-cdp.mjs"), ...scrapeArgv(niche, worklistRel, handles)], projectDir);
+  if (scrapeCode !== 0) {
+    await alert(`🛰️ Viral Radar refresh failed: the CDP scrape exited ${scrapeCode}. Check the debug Chrome / Instagram login.`);
+    console.error(`scrape exited ${scrapeCode}`);
+    process.exit(scrapeCode);
+  }
 
+  // Steps 3–7.5 — bounded agent work on the ready work-list (enrich → rank → render → digest).
+  const argv = claudeArgv(claudeEnrichPrompt(niche, worklistRel), { model });
+  console.log(`[refresh] enriching + rendering + digest via ${claudeBin} -p …`);
+  const code = await run(claudeBin, argv, projectDir);
   if (code !== 0) {
     await alert(`🛰️ Viral Radar refresh failed (claude exited ${code}). Check ${path.join(projectDir, "viral-radar-out/refresh.log")}.`);
     console.error(`claude exited ${code}`);
