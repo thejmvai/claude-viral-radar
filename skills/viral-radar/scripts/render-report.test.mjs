@@ -66,3 +66,15 @@ test("escapes html in user content", () => {
   const html = renderReport(evil, { framesBaseUrl: "" });
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
 });
+
+test("badges an inspiration reel and leaves normal reels unbadged", () => {
+  // The .pill-inspo CSS rule is always in the stylesheet; the badge itself is `class="pill-inspo"`.
+  const plain = renderReport(ds, { framesBaseUrl: "" });
+  assert.doesNotMatch(plain, /class="pill-inspo"/); // no badge span for a normal tracked reel
+
+  const inspo = JSON.parse(JSON.stringify(ds));
+  inspo.reels[0].trackingCategory = "inspiration";
+  const html = renderReport(inspo, { framesBaseUrl: "" });
+  assert.match(html, /class="pill-inspo"/);
+  assert.match(html, /INSPIRATION/);
+});

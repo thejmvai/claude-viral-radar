@@ -33,3 +33,22 @@ test("config validation catches missing threshold", () => {
   const errs = validateConfig({ niche: "n", label: "N" });
   assert.ok(errs.some((e) => e.includes("viralThreshold")));
 });
+
+test("inspirationHandles is optional but must be an array when present", () => {
+  const full = { niche: "ai-claude", label: "AI / Claude", viralThreshold: 100000, velocityThreshold: 50000,
+    velocityWindowHours: 48, qualityGateLikeRate: 0.005, seedHashtags: [], trackedHandles: [],
+    discoveryEnabled: true, discoveryMinViews: 50000, scrapeTargetPerHandle: 36, minPerHandle: 5,
+    enrichmentCapPerRun: 60, recencyWeight: 0.35, recencyHalfLifeDays: 30, updatedAt: "2026-06-20" };
+  assert.deepEqual(validateConfig(full), []);                                  // absent -> fine
+  assert.deepEqual(validateConfig({ ...full, inspirationHandles: ["@x"] }), []); // array -> fine
+  assert.ok(validateConfig({ ...full, inspirationHandles: "@x" })              // string -> error
+    .some((e) => e.includes("inspirationHandles must be an array")));
+});
+
+test("reel trackingCategory is optional; a bad value is reported, a good one passes", () => {
+  const ds = { niche: "n", generatedAt: "t", nicheSynthesis: { whatsWorking: [], topPatterns: [], summary: "" },
+    reels: [{ ...reel, trackingCategory: "inspiration" }], quarantined: [] };
+  assert.deepEqual(validateDataset(ds), []);
+  const bad = { ...ds, reels: [{ ...reel, trackingCategory: "bogus" }] };
+  assert.ok(validateDataset(bad).some((e) => e.includes("invalid trackingCategory")));
+});

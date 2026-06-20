@@ -141,8 +141,9 @@ async function main() {
   }
   const minViews = Number(arg("min-views", cfg.discoveryMinViews ?? cfg.velocityThreshold ?? 50000));
 
-  // exclude = tracked handles + handles already in the dataset
-  const exclude = new Set((cfg.trackedHandles || []).map(normHandle));
+  // exclude = tracked + inspiration handles + handles already in the dataset
+  // (inspiration handles are out-of-niche on purpose — never surface them as niche discovery)
+  const exclude = new Set([...(cfg.trackedHandles || []), ...(cfg.inspirationHandles || [])].map(normHandle));
   const dsPath = path.join(outDir, `${niche}.json`);
   if (fs.existsSync(dsPath)) {
     try {
