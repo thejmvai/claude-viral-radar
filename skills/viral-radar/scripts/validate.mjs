@@ -24,6 +24,11 @@ export function validateDataset(ds) {
     if (ds[f] === undefined) errs.push(`dataset missing ${f}`);
   (ds.reels || []).forEach((r, i) => errs.push(...validateReel(r, `reels[${i}]`)));
   (ds.quarantined || []).forEach((r, i) => errs.push(...validateReel(r, `quarantined[${i}]`)));
+  // offNiche is optional (off-niche reference reels); validate each like a reel when present.
+  if (ds.offNiche !== undefined) {
+    if (!Array.isArray(ds.offNiche)) errs.push("dataset.offNiche not an array");
+    else ds.offNiche.forEach((r, i) => errs.push(...validateReel(r, `offNiche[${i}]`)));
+  }
   return errs;
 }
 

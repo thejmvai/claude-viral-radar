@@ -123,15 +123,27 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
     : "";
   const channels = new Set(ds.reels.map((r) => r.handle)).size;
   const sub = `${ds.reels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
+  const offNiche = ds.offNiche || [];
+  const hasOff = offNiche.length > 0;
+  const offCards = offNiche.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
+  const offNote = `<div class="offnote">Off-niche reference accounts &mdash; tracked for viral mechanics, not niche signal. Kept out of the main ranking and the digest.</div>`;
   const cp = ds.crossPlatform;
   const hasCP = !!(cp && Array.isArray(cp.sources) && cp.sources.length);
   const othersCount = hasCP ? cp.sources.reduce((s, x) => s + (x.items || []).length, 0) : 0;
-  const tabBar = hasCP
-    ? `<div class="tabs"><button class="tab on" data-tab="reels">&#128241; Instagram Reels <span class="tcount">${ds.reels.length}</span></button><button class="tab" data-tab="others">&#127760; Others <span class="tcount">${othersCount}</span></button></div>`
-    : "";
-  const mainBody = hasCP
-    ? `${tabBar}<div class="tabpanel" data-panel="reels">\n${cards}\n${quar}\n</div><div class="tabpanel hidden" data-panel="others">${crossPlatformSection(ds)}</div>`
-    : `${cards}\n${crossPlatformSection(ds)}\n${quar}`;
+  let mainBody;
+  if (hasOff || hasCP) {
+    const tabDefs = [{ k: "reels", label: "&#128241; Instagram Reels", n: ds.reels.length }];
+    if (hasOff) tabDefs.push({ k: "offniche", label: "&#129694; Off-niche", n: offNiche.length });
+    if (hasCP) tabDefs.push({ k: "others", label: "&#127760; Others", n: othersCount });
+    const tabBar = `<div class="tabs">${tabDefs.map((t, i) => `<button class="tab${i === 0 ? " on" : ""}" data-tab="${t.k}">${t.label} <span class="tcount">${t.n}</span></button>`).join("")}</div>`;
+    const panel = (k, inner, on) => `<div class="tabpanel${on ? "" : " hidden"}" data-panel="${k}">${inner}</div>`;
+    let panels = panel("reels", `${cards}\n${quar}`, true);
+    if (hasOff) panels += panel("offniche", `${offNote}\n${offCards}`, false);
+    if (hasCP) panels += panel("others", crossPlatformSection(ds), false);
+    mainBody = `${tabBar}${panels}`;
+  } else {
+    mainBody = `${cards}\n${crossPlatformSection(ds)}\n${quar}`;
+  }
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Viral Radar — ${esc(ds.niche)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -207,6 +219,7 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 .tab:hover{color:var(--text)}.tab.on{color:var(--text);border-bottom-color:var(--red)}
 .tab .tcount{font-family:var(--mono);font-size:11px;color:var(--faint);background:var(--card-2);border:1px solid var(--border);border-radius:7px;padding:1px 7px}.tab.on .tcount{color:var(--red);border-color:var(--red-bd)}
 .tabpanel.hidden{display:none}.trends{margin-top:8px;border-top:0;padding-top:0}
+.offnote{margin:2px 0 22px;padding:12px 16px;background:var(--card-2);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:10px;color:var(--muted);font-size:13.5px;line-height:1.6}
 @media print{.tabs{display:none}.tabpanel.hidden{display:block!important}.trends{margin-top:44px;border-top:1px solid var(--border);padding-top:30px}}
 @media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}
 /* Print / PDF export: show ALL storyboard frames as a filmstrip and expand transcripts */

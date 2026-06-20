@@ -60,6 +60,25 @@ test("omits hook frames when a reel has none", () => {
   assert.doesNotMatch(html, /class="hookframes"/);
 });
 
+test("renders an Off-niche tab with its own reels and a note", () => {
+  const withOff = JSON.parse(JSON.stringify(ds));
+  const ref = JSON.parse(JSON.stringify(ds.reels[0]));
+  ref.handle = "@alfie_dundas";
+  ref.hook = "off niche comedy bit";
+  withOff.offNiche = [ref];
+  const html = renderReport(withOff, { framesBaseUrl: "" });
+  assert.match(html, /data-tab="offniche"/);
+  assert.match(html, /Off-niche/);
+  assert.match(html, /offnote/);
+  assert.match(html, /off niche comedy bit/);
+  assert.match(html, /@alfie_dundas/);
+});
+
+test("no Off-niche tab when offNiche is empty/absent", () => {
+  const html = renderReport(ds, { framesBaseUrl: "" });
+  assert.doesNotMatch(html, /data-tab="offniche"/);
+});
+
 test("escapes html in user content", () => {
   const evil = JSON.parse(JSON.stringify(ds));
   evil.reels[0].hook = '<script>alert(1)</script>';

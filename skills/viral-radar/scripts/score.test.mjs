@@ -1,6 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { likeRate, commentRate, breakout, reachMultiple, qualityFlag, isViral, replicability, signalScore, ageHoursFrom, recencyScore, rankScore, rankReels } from "./score.mjs";
+import { likeRate, commentRate, breakout, reachMultiple, qualityFlag, isViral, replicability, signalScore, ageHoursFrom, recencyScore, rankScore, rankReels, splitOffNiche } from "./score.mjs";
+
+test("splitOffNiche separates off-niche handles (normalized) from the rest", () => {
+  const reels = [
+    { handle: "@aiwithankit", views: 1 },
+    { handle: "@alfie_dundas", views: 2 },
+    { handle: "AlfiE_Dundas", views: 3 }, // case/no-@ variant still matches
+    { handle: "@cooper.simson", views: 4 },
+  ];
+  const { onNiche, offNiche } = splitOffNiche(reels, ["alfie_dundas"]);
+  assert.equal(onNiche.length, 2);
+  assert.equal(offNiche.length, 2);
+  assert.deepEqual(onNiche.map((r) => r.handle), ["@aiwithankit", "@cooper.simson"]);
+  // empty/missing list -> everything on-niche
+  assert.equal(splitOffNiche(reels, []).offNiche.length, 0);
+  assert.equal(splitOffNiche(reels).offNiche.length, 0);
+});
 
 test("rate metrics", () => {
   assert.equal(likeRate(26000, 1000000).toFixed(3), "0.026");

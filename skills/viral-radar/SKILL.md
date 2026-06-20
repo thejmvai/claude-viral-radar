@@ -148,14 +148,15 @@ For each reel:
 ## Step 4 — Quality gate + ranking
 
 1. Reels where `qualityFlag === "boosted"` go into `quarantined` (not ranked, excluded from synthesis).
-2. Rank gate-passing reels with `rankReels(reels, { now, recencyWeight: config.recencyWeight, halfLifeDays: config.recencyHalfLifeDays })` from `scripts/score.mjs`. This blends `signalScore` (quality) with `recencyScore` (time of post) so fresh, high-signal reels rise to the top; it writes `recencyScore`, `rankScore`, and a sequential `rank` onto each reel.
-3. **Keep the full library.** Every gate-passing reel that was enriched belongs in `reels` — do **not** collapse to a curated "one per creator" or top-N subset. The report is meant to be a rich, browsable library (≥5 per channel), not a highlight reel. The only reels excluded from `reels` are the `quarantined` ones.
+2. **Off-niche split:** call `splitOffNiche(reels, config.offNicheHandles)` from `scripts/score.mjs`. Reels from `offNicheHandles` go into a separate `offNiche` bucket — tracked + enriched as "viral mechanics" references (e.g. a comedy account that goes huge) but kept **out of** the main ranking, synthesis, and digest so they don't crowd out the niche signal. `offNicheHandles` is optional (omit/empty = everything is on-niche).
+3. Rank the on-niche gate-passing reels with `rankReels(reels, { now, recencyWeight: config.recencyWeight, halfLifeDays: config.recencyHalfLifeDays })` from `scripts/score.mjs`. This blends `signalScore` (quality) with `recencyScore` (time of post) so fresh, high-signal reels rise to the top; it writes `recencyScore`, `rankScore`, and a sequential `rank` onto each reel. Rank the `offNiche` bucket the same way (its own ranking).
+4. **Keep the full library.** Every on-niche gate-passing reel that was enriched belongs in `reels` — do **not** collapse to a curated "one per creator" or top-N subset. The report is meant to be a rich, browsable library (≥5 per channel), not a highlight reel. Reels excluded from `reels` are the `quarantined` and `offNiche` ones.
 
 ---
 
 ## Step 5 — Synthesis
 
-Regenerate `nicheSynthesis` from the gate-passing reels:
+Regenerate `nicheSynthesis` from the **on-niche** gate-passing reels (exclude `offNiche` — they're references, not niche signal):
 
 - `whatsWorking`: 3–5 replicable, actionable plays distilled from the top reels (e.g. "Teach one named skill, not a list of tips")
 - `topPatterns`: array of `{ pattern, count }` — structural patterns detected across reels (e.g. "claim-proof-cta")
@@ -165,7 +166,7 @@ Regenerate `nicheSynthesis` from the gate-passing reels:
 
 ## Step 6 — Write outputs
 
-1. Build the full `ViralDataset` object: `{ niche, generatedAt, nicheSynthesis, reels, quarantined }`.
+1. Build the full `ViralDataset` object: `{ niche, generatedAt, nicheSynthesis, reels, quarantined, offNiche }` (include `offNiche` when `offNicheHandles` is set — `render-report.mjs` shows it as a separate "Off-niche" tab).
    - **Optional cross-platform trends:** to add a "Hot across the niche" section below the reels, run `/last30days <niche>` (free sources suffice) and attach the top items as `crossPlatform: { window, summary, themes: [...], sources: [{ platform, icon, items: [{ title, url, metric }] }] }`. `render-report.mjs` renders it automatically when present — competitor reels above, niche-wide chatter (Reddit, TikTok, YouTube, GitHub) below.
 2. **Validate first:** run `node scripts/validate.mjs viral-radar-out/<niche>.config.json` and the dataset object (pipe JSON or write a temp file). If validation errors are returned, print them and **abort the write**.
 3. Write `viral-radar-out/<niche>.json` (overwrite).

@@ -56,6 +56,18 @@ export function rankScore({ signalScore: ss, postedAt, now = new Date(), recency
   return Math.round((1 - w) * ss + w * 100 * rec);
 }
 
+const normH = (h) => String(h || "").trim().replace(/^@/, "").toLowerCase();
+
+// Split reels into on-niche vs off-niche by handle. Off-niche handles are tracked + enriched as
+// "viral mechanics" references (e.g. a comedy account that goes huge) but kept OUT of the main
+// ranking/digest so they don't crowd out the niche signal. `offNicheHandles` from the config.
+export function splitOffNiche(reels, offNicheHandles = []) {
+  const off = new Set((offNicheHandles || []).map(normH));
+  const onNiche = [], offNiche = [];
+  for (const r of reels || []) (off.has(normH(r.handle)) ? offNiche : onNiche).push(r);
+  return { onNiche, offNiche };
+}
+
 // Rank a list of gate-passing reels by rankScore (desc); ties break to the newer post.
 // Mutates+returns each reel with { recencyScore, rankScore, rank }. `now` defaults to current time.
 export function rankReels(reels, { now = new Date(), recencyWeight = 0.35, halfLifeDays = 30 } = {}) {

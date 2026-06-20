@@ -7,6 +7,7 @@
   "qualityGateLikeRate": 0.005,
   "seedHashtags": ["claude", "claudecode", "aiagents", "aiautomation"],
   "trackedHandles": [],
+  "offNicheHandles": [],
   "discoveryEnabled": true,
   "discoveryMinViews": 50000,
   "scrapeTargetPerHandle": 36,
