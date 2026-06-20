@@ -209,6 +209,24 @@ node scripts/notify-telegram.mjs --niche=<niche>
 
 ---
 
+## Step 8 — Ideator (optional: insight → reel ideas in his voice)
+
+Turn the radar into reel ideas. Workflow SOP: `workflows/ideator.md`. **GATE: ideas are his-voice content
+— produce a DRAFT for Jameson's review, never auto-publish.**
+
+1. **Grounding pack:** `node scripts/ideator.mjs viral-radar-out/<niche>.json` prints `buildIdeaContext`
+   (top on-niche reels + patterns + whatsWorking + trends — inspiration reels excluded). That's the
+   evidence each idea must cite.
+2. **Generate:** read `/Users/jamesonchua/Claude/AIOS/references/voice.md`, then write **5–10 ideas**, each
+   `{ hook (≤12 words), angle, format, grounding:{type,ref,note} }`, strictly in his voice (openers +
+   devices, SIMPLICITY, no em dashes, no fabricated scale), each grounded in a real radar/trend/pattern.
+3. **Validate:** write the ideas to `viral-radar-out/ideas-<niche>.json` as `{ niche, generatedAt, ideas }`,
+   then `node scripts/ideator.mjs viral-radar-out/<niche>.json viral-radar-out/ideas-<niche>.json`. Fix any
+   errors (hook length, missing fields, missing grounding, em dashes) and re-validate until `OK`.
+4. **Show in the report (optional):** attach `ds.ideas = ideas` and re-render — `render-report.mjs` shows
+   an **"💡 Ideas" tab**.
+5. **Review gate:** present the ideas to Jameson as a draft. Do not post/schedule/publish until he approves.
+
 ## Scope notes
 
 - **Tracked-handle scraping** (Step 2) is the spine: it runs via the chrome-devtools browser, no API key needed.

@@ -76,6 +76,20 @@ test("inspiration reels go to their own tab, out of the main ranking + stat-bar"
   assert.match(html, /Inspiration <span class="tcount">1<\/span>/);
 });
 
+test("renders an Ideas tab from ds.ideas", () => {
+  const d = JSON.parse(JSON.stringify(ds));
+  d.ideas = [{ hook: "Hot take, you do not need five tools", angle: "the one-workflow reframe", format: "Talking-head", grounding: { type: "pattern", ref: "comment-to-DM gate", note: "top pattern" } }];
+  const html = renderReport(d, { framesBaseUrl: "" });
+  assert.match(html, /data-tab="ideas"/);
+  assert.match(html, /Ideas <span class="tcount">1<\/span>/);
+  assert.match(html, /Hot take, you do not need five tools/);
+  assert.match(html, /comment-to-DM gate/);
+});
+
+test("no Ideas tab when ds.ideas is absent", () => {
+  assert.doesNotMatch(renderReport(ds, { framesBaseUrl: "" }), /data-tab="ideas"/);
+});
+
 test("escapes html in user content", () => {
   const evil = JSON.parse(JSON.stringify(ds));
   evil.reels[0].hook = '<script>alert(1)</script>';
