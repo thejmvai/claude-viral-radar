@@ -115,6 +115,23 @@ function statBar(ds) {
   ].join("")}</div>`;
 }
 
+// Optional "Ideas" tab: on-voice reel ideas from the Ideator, each grounded in a real radar/trend item.
+function ideasSection(ideas) {
+  if (!ideas || !ideas.length) return "";
+  const note = `<div class="offnote">Reel ideas from the Ideator &mdash; in Jameson's voice, each grounded in a real reel / trend / pattern from the radar. A draft for review, not auto-published.</div>`;
+  const cards = ideas.map((it, i) => {
+    const g = it.grounding || {};
+    const gtxt = g.ref ? `${esc(g.type || "ref")}: ${esc(g.ref)}${g.note ? ` &middot; ${esc(g.note)}` : ""}` : "";
+    return `<div class="idea">
+      <div class="idea-h"><span class="idea-n">${String(i + 1).padStart(2, "0")}</span>${it.format ? `<span class="ftag">${esc(it.format)}</span>` : ""}</div>
+      <div class="idea-hook">&ldquo;${esc(it.hook)}&rdquo;</div>
+      <div class="idea-angle">${esc(it.angle)}</div>
+      ${gtxt ? `<div class="idea-ground">${gtxt}</div>` : ""}
+    </div>`;
+  }).join("");
+  return `${note}<div class="ideas">${cards}</div>`;
+}
+
 export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
   const plays = ds.nicheSynthesis.whatsWorking.map((p, i) => `<div class="play"><b>0${i + 1}</b><span>${esc(p)}</span></div>`).join("");
   // Split the inspiration lane out of the main ranking — its own tab, renumbered per lane, kept out of the
@@ -131,17 +148,21 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
     : "";
   const channels = new Set(mainReels.map((r) => r.handle)).size;
   const sub = `${mainReels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
+  const ideas = ds.ideas || [];
+  const hasIdeas = ideas.length > 0;
   const cp = ds.crossPlatform;
   const hasCP = !!(cp && Array.isArray(cp.sources) && cp.sources.length);
   const othersCount = hasCP ? cp.sources.reduce((s, x) => s + (x.items || []).length, 0) : 0;
   let mainBody;
-  if (hasInspo || hasCP) {
+  if (hasIdeas || hasInspo || hasCP) {
     const tabDefs = [{ k: "reels", label: "&#128241; Instagram Reels", n: mainReels.length }];
+    if (hasIdeas) tabDefs.push({ k: "ideas", label: "&#128161; Ideas", n: ideas.length });
     if (hasInspo) tabDefs.push({ k: "inspo", label: "&#10024; Inspiration", n: inspoReels.length });
     if (hasCP) tabDefs.push({ k: "others", label: "&#127760; Others", n: othersCount });
     const tabBar = `<div class="tabs">${tabDefs.map((t, i) => `<button class="tab${i === 0 ? " on" : ""}" data-tab="${t.k}">${t.label} <span class="tcount">${t.n}</span></button>`).join("")}</div>`;
     const panel = (k, inner, on) => `<div class="tabpanel${on ? "" : " hidden"}" data-panel="${k}">${inner}</div>`;
     let panels = panel("reels", `${cards}\n${quar}`, true);
+    if (hasIdeas) panels += panel("ideas", ideasSection(ideas), false);
     if (hasInspo) panels += panel("inspo", `${inspoNote}\n${inspoCards}`, false);
     if (hasCP) panels += panel("others", crossPlatformSection(ds), false);
     mainBody = `${tabBar}${panels}`;
@@ -225,6 +246,7 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 .tab .tcount{font-family:var(--mono);font-size:11px;color:var(--faint);background:var(--card-2);border:1px solid var(--border);border-radius:7px;padding:1px 7px}.tab.on .tcount{color:var(--red);border-color:var(--red-bd)}
 .tabpanel.hidden{display:none}.trends{margin-top:8px;border-top:0;padding-top:0}
 .offnote{margin:2px 0 22px;padding:12px 16px;background:var(--card-2);border:1px solid var(--border);border-left:3px solid #9678FF;border-radius:10px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.ideas{display:grid;gap:16px}.idea{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px}.idea-h{display:flex;align-items:center;gap:12px;margin-bottom:12px}.idea-n{font-family:var(--mono);font-weight:700;color:var(--red);font-size:14px}.idea-hook{font-size:20px;font-weight:600;line-height:1.3;margin-bottom:10px}.idea-angle{color:var(--muted);font-size:14.5px;line-height:1.6}.idea-ground{margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:10px}
 @media print{.tabs{display:none}.tabpanel.hidden{display:block!important}.trends{margin-top:44px;border-top:1px solid var(--border);padding-top:30px}}
 @media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}
 /* Print / PDF export: show ALL storyboard frames as a filmstrip and expand transcripts */
