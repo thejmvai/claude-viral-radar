@@ -60,6 +60,22 @@ test("omits hook frames when a reel has none", () => {
   assert.doesNotMatch(html, /class="hookframes"/);
 });
 
+test("inspiration reels go to their own tab, out of the main ranking + stat-bar", () => {
+  const d = JSON.parse(JSON.stringify(ds)); // 1 normal reel
+  const inspo = JSON.parse(JSON.stringify(ds.reels[0]));
+  inspo.handle = "@alfie_dundas"; inspo.shortcode = "InspoXYZ";
+  inspo.url = "https://www.instagram.com/reel/InspoXYZ/";
+  inspo.hook = "off niche comedy bit"; inspo.trackingCategory = "inspiration";
+  d.reels = [...d.reels, inspo];
+  const html = renderReport(d, { framesBaseUrl: "" });
+  assert.match(html, /data-tab="inspo"/);
+  assert.match(html, /Inspiration lane &mdash;/); // the note
+  assert.match(html, /off niche comedy bit/);     // rendered (in the inspo tab)
+  // counts: 1 on-niche reel in the main tab + stat-bar, 1 in the inspiration tab
+  assert.match(html, /Instagram Reels <span class="tcount">1<\/span>/);
+  assert.match(html, /Inspiration <span class="tcount">1<\/span>/);
+});
+
 test("escapes html in user content", () => {
   const evil = JSON.parse(JSON.stringify(ds));
   evil.reels[0].hook = '<script>alert(1)</script>';
