@@ -52,7 +52,7 @@ function reelCard(r, framesBaseUrl, resolveFrame) {
       <a class="igbtn" href="${esc(r.url)}" target="_blank" rel="noopener">Open on Instagram <span class="ic">&#8599;</span></a>
     </div>
     <div class="right">
-      <div class="who"><h2>${esc(r.handle)}</h2><span class="pill-reel">REEL</span></div>
+      <div class="who"><h2>${esc(r.handle)}</h2><span class="pill-reel">REEL</span>${r.trackingCategory === "inspiration" ? '<span class="pill-inspo">INSPIRATION &middot; FORMAT</span>' : ""}</div>
       <div class="chips">
         ${chip(EYE, fmt(r.metrics.views), "eye")}
         ${chip(HEART, fmt(r.metrics.likes), "heart")}
@@ -184,7 +184,8 @@ const REPORT_CSS = `
 .fcount{position:absolute;right:10px;top:10px;font-family:var(--mono);font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:3px 9px;border-radius:8px;z-index:2}
 .cap{font-size:12px;color:var(--muted);text-align:center;margin-top:11px}.cap b{color:var(--red)}
 .igbtn{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;width:100%;background:var(--card-2);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 18px;font-size:13px;text-decoration:none}.igbtn .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 30% 107%,#fce6a4,#f06748 44%,#cc3d92 60%,#4a64d8 92%)}
-.who{display:flex;align-items:center;gap:12px;margin-bottom:16px}.who h2{font-size:24px;font-weight:600;margin:0}.pill-reel{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--red);border:1px solid var(--red-bd);background:var(--red-bg);border-radius:7px;padding:3px 9px}
+.who{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}.who h2{font-size:24px;font-weight:600;margin:0}.pill-reel{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--red);border:1px solid var(--red-bd);background:var(--red-bg);border-radius:7px;padding:3px 9px}
+.pill-inspo{font-size:11px;font-weight:600;letter-spacing:.08em;color:#B69CFF;border:1px solid rgba(150,120,255,.42);background:rgba(150,120,255,.13);border-radius:7px;padding:3px 9px}
 .chips{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:8px}.chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:13px;background:var(--card-2);border:1px solid var(--border);border-radius:9px;padding:6px 12px}.chip svg{width:14px;height:14px}.chip.eye svg{color:var(--muted)}.chip.heart svg{color:var(--heart)}.chip.cmt svg{color:var(--muted)}.chip.date{color:var(--muted)}.chip.date svg{color:var(--faint)}.chip.score{background:rgba(70,193,120,.10);border-color:rgba(70,193,120,.40);color:#7FE0A6;font-weight:600}.chip.score svg{color:var(--green)}.chip.hot{background:var(--red-bg);border-color:var(--red-bd);color:#FF8E62;font-weight:600}.chip.hot svg{color:var(--fire)}
 .qrow{font-size:12.5px;color:var(--faint);margin-bottom:24px;display:flex;gap:18px;flex-wrap:wrap}.qrow b{font-family:var(--mono);color:var(--muted)}.qrow .organic{color:var(--green)}
 .sec{margin-top:22px}.seclabel{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}.hook{font-size:23px;font-weight:600;line-height:1.3}.ftag{display:inline-block;font-size:13.5px;font-weight:600;color:var(--amber);background:rgba(240,183,62,.08);border:1px solid rgba(240,183,62,.42);border-radius:10px;padding:7px 16px}.breakdown{font-size:15px;color:var(--muted);line-height:1.7}

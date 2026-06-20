@@ -113,14 +113,16 @@ export function median(nums) {
 }
 
 // A grid tile + its og data -> a work-list reel (same pre-enrichment shape Step 2 produced inline).
-export function buildWorklistItem({ shortcode, views, og = {}, handle, followers, creatorMedianViews, viralReason, now = new Date() }) {
+// trackingCategory: pass "inspiration" for out-of-niche handles (tracked for hook/format/editing only).
+// When set, it's stamped onto the reel so the report can badge it and synthesis can exclude it.
+export function buildWorklistItem({ shortcode, views, og = {}, handle, followers, creatorMedianViews, viralReason, trackingCategory = null, now = new Date() }) {
   const likes = og.likes || 0;
   const comments = og.comments || 0;
   const postedAt = og.postedAt || null;
   const lr = likeRate(likes, views);
   const cr = commentRate(comments, views);
   const bo = breakout(views, creatorMedianViews);
-  return {
+  const item = {
     shortcode,
     url: `https://www.instagram.com/reel/${shortcode}/`,
     handle: handle.startsWith("@") ? handle : `@${handle}`,
@@ -139,6 +141,27 @@ export function buildWorklistItem({ shortcode, views, og = {}, handle, followers
     signalScore: signalScore({ likeRate: lr, commentRate: cr, ctaType: "", breakout: bo, followers: followers || 0 }),
     qualityFlag: qualityFlag(lr),
   };
+  if (trackingCategory) item.trackingCategory = trackingCategory;
+  return item;
+}
+
+// Merge the tracked + inspiration handle lanes into one scrape list, de-duped and category-tagged.
+// `explicit` (the --handles override) wins when present, but a handle's category is always derived
+// from config membership so /viral-competitor's "newly added handles only" run still tags correctly.
+export function resolveScrapeList(cfg = {}, explicit = []) {
+  const inspo = new Set((cfg.inspirationHandles || []).map(normHandle));
+  const base = (explicit && explicit.length)
+    ? explicit
+    : [...(cfg.trackedHandles || []), ...(cfg.inspirationHandles || [])];
+  const seen = new Set();
+  const out = [];
+  for (const h of base) {
+    const n = normHandle(h);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    out.push({ handle: n, trackingCategory: inspo.has(n) ? "inspiration" : null });
+  }
+  return out;
 }
 
 // Which grid tiles even need an og fetch: views at/above the velocity floor.
@@ -162,7 +185,7 @@ function arg(name, def = null) {
   return process.argv.includes(`--${name}`) ? true : def;
 }
 
-async function scrapeHandle(cdp, handle, cfg, seen, now) {
+async function scrapeHandle(cdp, handle, cfg, seen, now, trackingCategory = null) {
   const h = normHandle(handle);
   const target = Number(cfg.scrapeTargetPerHandle ?? 36);
   // The grid is a SPA — tiles populate after navigation. It can also come back empty (header only)
@@ -207,7 +230,7 @@ async function scrapeHandle(cdp, handle, cfg, seen, now) {
     const reason = viralReasonFor({ views: cand.views, ageHours }, cfg);
     if (!reason) continue;
     reels.push(buildWorklistItem({
-      shortcode: cand.shortcode, views: cand.views, og, handle: h, followers, creatorMedianViews, viralReason: reason, now,
+      shortcode: cand.shortcode, views: cand.views, og, handle: h, followers, creatorMedianViews, viralReason: reason, trackingCategory, now,
     }));
     await wait(1500); // pace reel fetches
   }
@@ -225,9 +248,9 @@ async function main() {
   if (!fs.existsSync(cfgPath)) { console.error(`No config at ${cfgPath}.`); process.exit(1); }
   const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 
-  let handles = (arg("handles") || "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (!handles.length) handles = cfg.trackedHandles || [];
-  if (!handles.length) { console.error("No trackedHandles. Add some with /viral-competitor."); process.exit(1); }
+  const explicit = (arg("handles") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const scrapeList = resolveScrapeList(cfg, explicit); // [{ handle, trackingCategory }] — tracked + inspiration lanes
+  if (!scrapeList.length) { console.error("No trackedHandles. Add some with /viral-competitor."); process.exit(1); }
 
   const seenPath = path.join(outDir, "cache", `${niche}-seen.json`);
   let seen = {};
@@ -249,17 +272,17 @@ async function main() {
   const gapMs = Number(arg("gap", 4000)); // pacing between handles — Instagram throttles bursts
   const perHandle = [];
   const allReels = [];
-  for (let i = 0; i < handles.length; i++) {
-    const handle = handles[i];
+  for (let i = 0; i < scrapeList.length; i++) {
+    const { handle, trackingCategory } = scrapeList[i];
     if (i > 0) await wait(gapMs);
-    process.stdout.write(`  @${normHandle(handle)} … `);
+    process.stdout.write(`  @${handle}${trackingCategory === "inspiration" ? " (inspiration)" : ""} … `);
     try {
-      const r = await scrapeHandle(cdp, handle, cfg, seen, now);
-      perHandle.push({ handle: r.handle, kept: r.reels.length, gridSize: r.gridSize, followers: r.followers, throttled: r.throttled });
+      const r = await scrapeHandle(cdp, handle, cfg, seen, now, trackingCategory);
+      perHandle.push({ handle: r.handle, trackingCategory, kept: r.reels.length, gridSize: r.gridSize, followers: r.followers, throttled: r.throttled });
       allReels.push(...r.reels);
       console.log(`${r.reels.length} new viral / ${r.gridSize} tiles${r.throttled ? " (throttled: header only)" : ""}`);
     } catch (e) {
-      perHandle.push({ handle: `@${normHandle(handle)}`, kept: 0, error: String(e.message || e) });
+      perHandle.push({ handle: `@${handle}`, trackingCategory, kept: 0, error: String(e.message || e) });
       console.log(`error: ${e.message || e}`);
     }
   }
@@ -274,7 +297,7 @@ async function main() {
     niche, source: "cdp", scrapedAt: now.toISOString(), minPerHandle, perHandle, underFloor, throttledHandles, reels: allReels,
   }, null, 2));
 
-  console.log(`\nWork-list: ${allReels.length} new viral reels across ${handles.length} handles → ${out}`);
+  console.log(`\nWork-list: ${allReels.length} new viral reels across ${scrapeList.length} handles → ${out}`);
   if (underFloor.length) console.log(`Under ${minPerHandle}/handle: ${underFloor.join(", ")}`);
   if (throttledHandles.length) console.log(`⚠ ${throttledHandles.length} handle(s) returned header-only (Instagram throttling). Re-run later / increase --gap. Affected: ${throttledHandles.join(", ")}`);
   console.log("Next: feed this work-list into Step 3 enrichment (the agent reads it and continues the pipeline).");

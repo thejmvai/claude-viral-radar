@@ -7,6 +7,7 @@ import {
   candidateTiles,
   viralReasonFor,
   buildWorklistItem,
+  resolveScrapeList,
 } from "./scrape-cdp.mjs";
 
 // Minimal fake of the global WebSocket (addEventListener/send/close), with an
@@ -147,4 +148,40 @@ test("buildWorklistItem flags boosted + null followers gracefully", () => {
   assert.equal(item.reachMultiple, null);
   assert.equal(item.handle, "@h");
   assert.equal(item.postedAt, null);
+});
+
+test("buildWorklistItem omits trackingCategory by default, stamps it when given", () => {
+  const base = { shortcode: "X", views: 200000, og: { likes: 8000, comments: 100 }, handle: "h", followers: 50000, creatorMedianViews: 40000, viralReason: "absolute" };
+  const plain = buildWorklistItem(base);
+  assert.ok(!("trackingCategory" in plain)); // backward-compatible: field absent for normal reels
+  const inspo = buildWorklistItem({ ...base, trackingCategory: "inspiration" });
+  assert.equal(inspo.trackingCategory, "inspiration");
+});
+
+test("resolveScrapeList merges both lanes, de-dupes, and tags inspiration handles", () => {
+  const cfg = { trackedHandles: ["@aiwithankit", "MissExcel"], inspirationHandles: ["@itsruiz.jr"] };
+  const list = resolveScrapeList(cfg);
+  assert.deepEqual(list, [
+    { handle: "aiwithankit", trackingCategory: null },
+    { handle: "missexcel", trackingCategory: null },
+    { handle: "itsruiz.jr", trackingCategory: "inspiration" },
+  ]);
+});
+
+test("resolveScrapeList de-dupes a handle that is in both lanes (inspiration wins via membership)", () => {
+  const cfg = { trackedHandles: ["dup"], inspirationHandles: ["@DUP"] };
+  const list = resolveScrapeList(cfg);
+  assert.equal(list.length, 1);
+  assert.deepEqual(list[0], { handle: "dup", trackingCategory: "inspiration" });
+});
+
+test("resolveScrapeList honors an explicit --handles override but still tags from config membership", () => {
+  const cfg = { trackedHandles: ["a", "b"], inspirationHandles: ["itsruiz.jr"] };
+  const list = resolveScrapeList(cfg, ["@itsruiz.jr"]); // /viral-competitor newly-added-only run
+  assert.deepEqual(list, [{ handle: "itsruiz.jr", trackingCategory: "inspiration" }]);
+});
+
+test("resolveScrapeList tolerates a config with no inspiration lane", () => {
+  assert.deepEqual(resolveScrapeList({ trackedHandles: ["a"] }), [{ handle: "a", trackingCategory: null }]);
+  assert.deepEqual(resolveScrapeList({}), []);
 });

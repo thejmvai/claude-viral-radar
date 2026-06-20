@@ -32,7 +32,7 @@ All outputs are written under `viral-radar-out/` in the **user's current working
    - Copy `config/ai-claude.example.config.json` (located next to this SKILL.md) into `viral-radar-out/<niche>.config.json`.
    - Set the `niche` field to the user's niche slug (lowercase, hyphenated) and the `label` field to a readable display name.
    - If the niche is not `ai-claude` (i.e. the default config values may not apply), ask: "What view count should we use as the viral threshold for your niche? (default: 100000) And any seed hashtags?" Update `viralThreshold` and `seedHashtags` in the config with their answers.
-   - Leave `trackedHandles: []` in the config (competitors are added via `/viral-competitor`).
+   - Leave `trackedHandles: []` and `inspirationHandles: []` in the config (in-niche competitors and out-of-niche format references are both added via `/viral-competitor`; see `workflows/inspiration-lane.md`).
 
 5. **Finish:** write an empty file at `viral-radar-out/.onboarded` (create it with no content). Tell the user:
 
@@ -86,10 +86,12 @@ CDP scraper instead. Workflow SOP: `workflows/scrape-cdp.md`.
    ```
    node scripts/scrape-cdp.mjs --niche=<niche>
    ```
-   It iterates `config.trackedHandles`, opens each `/<handle>/reels/`, scrolls to `scrapeTargetPerHandle`,
+   It iterates `config.trackedHandles` **plus `config.inspirationHandles`** (the out-of-niche lane —
+   see `workflows/inspiration-lane.md`), opens each `/<handle>/reels/`, scrolls to `scrapeTargetPerHandle`,
    scrapes shortcodes + view counts, reads the follower count, fetches each viral candidate's
    `og:description` for exact likes/comments/postedAt, applies the same viral gate (`isViral`) and metrics
-   (`score.mjs`), and writes the **work-list** to `viral-radar-out/worklist-<niche>.json`.
+   (`score.mjs`), and writes the **work-list** to `viral-radar-out/worklist-<niche>.json`. Reels from an
+   inspiration handle carry `trackingCategory: "inspiration"` so Step 5 can exclude them from synthesis.
 3. Read `worklist-<niche>.json` and treat its `reels` array as the **work-list** for the rest of the
    pipeline — its item shape matches what the MCP Step 2 produced inline, so **continue at Step 3
    enrichment unchanged.**
@@ -155,7 +157,7 @@ For each reel:
 
 ## Step 5 — Synthesis
 
-Regenerate `nicheSynthesis` from the gate-passing reels:
+Regenerate `nicheSynthesis` from the gate-passing reels — but **exclude any reel with `trackingCategory === "inspiration"`**. Those are out-of-niche creators tracked only for their hook/format/editing (see `workflows/inspiration-lane.md`); their *topics* would skew the niche's trend analysis (and the downstream Ideator), so synthesize over `reels.filter((r) => r.trackingCategory !== "inspiration")` only. The inspiration reels still stay in `reels` and render in the report (badged) — they're just not a source of niche lessons.
 
 - `whatsWorking`: 3–5 replicable, actionable plays distilled from the top reels (e.g. "Teach one named skill, not a list of tips")
 - `topPatterns`: array of `{ pattern, count }` — structural patterns detected across reels (e.g. "claim-proof-cta")

@@ -26,6 +26,13 @@ Parse Instagram handles from the user's message:
 - Also collect bare words that look like handles (alphanumeric + underscores, no spaces) if no `@`-prefixed tokens were found.
 - De-duplicate the list.
 
+**Detect the lane.** A handle is either an in-niche **competitor** (default) or an out-of-niche
+**inspiration** creator — tracked only for their hook / format / editing, not their topic. Route a handle
+to the inspiration lane when the user signals it (e.g. "not in my niche", "for the format / hook / editing",
+"steal his style", "different space"). If the user lists several handles with mixed intent, ask which are
+inspiration vs competitor before writing. When unsure, default to competitor. See
+`../viral-radar/workflows/inspiration-lane.md`.
+
 If no handles were found, ask: "Which Instagram handles would you like to add? (e.g. @creator1 @creator2)"
 
 Wait for the user's reply and then parse handles from it before continuing.
@@ -36,7 +43,9 @@ Wait for the user's reply and then parse handles from it before continuing.
 
 1. Find the niche config file: look for `viral-radar-out/<niche>.config.json` in the current working directory. If multiple exist, pick the most recently modified (or prompt if ambiguous).
 2. Read the config JSON.
-3. Append the new handles to `trackedHandles`, de-duplicating against what is already there. A handle already present should not be added twice.
+3. Append each new handle to the lane chosen in Step 2: **competitor** handles → `trackedHandles`;
+   **inspiration** handles → `inspirationHandles` (create the array if the config predates this field).
+   De-duplicate against **both** lanes — a handle already present in either should not be added again.
 4. Write the updated config back to `viral-radar-out/<niche>.config.json`.
 
 ---
@@ -52,9 +61,10 @@ Run the full scrape and report workflow for the **newly added handles only** (no
   - `node ../viral-radar/scripts/parse-og.mjs`
   - `node ../viral-radar/scripts/extract-media.mjs`
 - Use the config loaded in Step 3 for thresholds (`viralThreshold`, `velocityThreshold`, etc.).
+- The scraper (`scrape-cdp.mjs`) reads both lanes from the config and stamps `trackingCategory: "inspiration"` on reels from an inspiration handle. Passing `--handles=<the new handle>` still tags it correctly (the tag comes from config membership, not the flag).
 - Append newly discovered reels to the existing dataset at `viral-radar-out/<niche>.json` (merge, do not overwrite the full dataset unless re-generating from scratch).
 - Update `viral-radar-out/cache/<niche>-seen.json` with newly processed shortcodes.
-- Re-run synthesis over all gate-passing reels in the merged dataset.
+- Re-run synthesis over the merged dataset's gate-passing reels, **excluding** any with `trackingCategory === "inspiration"` (out-of-niche style references must not skew the niche synthesis — see `../viral-radar/workflows/inspiration-lane.md`).
 - Validate with `../viral-radar/scripts/validate.mjs` before writing.
 - Render the report into the date-stamped archive folder, then update the latest pointer:
   ```
@@ -68,6 +78,6 @@ Run the full scrape and report workflow for the **newly added handles only** (no
 
 ## Step 5 — Confirm
 
-Tell the user which handles were added and where the report is:
+Tell the user which handles were added, to which lane, and where the report is:
 
-> "Added: @handle1, @handle2. Report refreshed at `viral-radar-out/report-latest.html` — open it in Chrome or print to PDF."
+> "Added: @handle1 (competitor), @handle2 (inspiration). Report refreshed at `viral-radar-out/report-latest.html` — open it in Chrome or print to PDF. Inspiration creators are badged `INSPIRATION · FORMAT` and kept out of the niche synthesis."

@@ -28,8 +28,11 @@ DevTools WebSocket refuses connections. The dedicated `--user-data-dir` keeps a 
 without touching your main Chrome.)
 
 ## Inputs
-- `viral-radar-out/<niche>.config.json` — `trackedHandles`, `scrapeTargetPerHandle`, `minPerHandle`,
-  `viralThreshold`, `velocityThreshold`, `velocityWindowHours`, `qualityGateLikeRate`.
+- `viral-radar-out/<niche>.config.json` — `trackedHandles`, `inspirationHandles`, `scrapeTargetPerHandle`,
+  `minPerHandle`, `viralThreshold`, `velocityThreshold`, `velocityWindowHours`, `qualityGateLikeRate`.
+  The scraper covers **both** handle lanes: in-niche `trackedHandles` and out-of-niche
+  `inspirationHandles`. Reels from an inspiration handle are stamped `trackingCategory: "inspiration"`
+  (see `workflows/inspiration-lane.md`).
 - The seen-cache `viral-radar-out/cache/<niche>-seen.json` (to keep only NEW viral reels).
 
 ## Tool
