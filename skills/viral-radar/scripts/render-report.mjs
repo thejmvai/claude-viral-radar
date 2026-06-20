@@ -96,7 +96,7 @@ function crossPlatformSection(ds) {
 
 // At-a-glance stat row above the tabs: reels, gate-pass %, channels, top views, discovered, transcribed.
 function statBar(ds) {
-  const reels = ds.reels || [];
+  const reels = (ds.reels || []).filter((r) => r.trackingCategory !== "inspiration");
   const quar = ds.quarantined || [];
   const caught = reels.length + quar.length;
   const pct = caught ? Math.round((100 * reels.length) / caught) : 100;
@@ -117,21 +117,37 @@ function statBar(ds) {
 
 export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
   const plays = ds.nicheSynthesis.whatsWorking.map((p, i) => `<div class="play"><b>0${i + 1}</b><span>${esc(p)}</span></div>`).join("");
-  const cards = ds.reels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
+  // Split the inspiration lane out of the main ranking — its own tab, renumbered per lane, kept out of the
+  // niche ranking/digest. Inspiration reels stay in ds.reels (tagged trackingCategory:"inspiration").
+  const isInspo = (r) => r.trackingCategory === "inspiration";
+  const mainReels = ds.reels.filter((r) => !isInspo(r)).map((r, i) => ({ ...r, rank: i + 1 }));
+  const inspoReels = ds.reels.filter(isInspo).map((r, i) => ({ ...r, rank: i + 1 }));
+  const hasInspo = inspoReels.length > 0;
+  const cards = mainReels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
+  const inspoCards = inspoReels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
+  const inspoNote = `<div class="offnote">Inspiration lane &mdash; out-of-niche creators tracked for hook/format craft, not niche signal. Kept out of the main ranking, synthesis, and digest.</div>`;
   const quar = ds.quarantined.length
     ? `<div class="quarantine"><div class="seclabel">Boosted / low-signal, excluded from lessons</div>${ds.quarantined.map((r) => `<div class="qline">${esc(r.handle)} &middot; ${fmt(r.metrics.views)} views &middot; <b>${(r.likeRate * 100).toFixed(3)}%</b> like-rate</div>`).join("")}</div>`
     : "";
-  const channels = new Set(ds.reels.map((r) => r.handle)).size;
-  const sub = `${ds.reels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
+  const channels = new Set(mainReels.map((r) => r.handle)).size;
+  const sub = `${mainReels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
   const cp = ds.crossPlatform;
   const hasCP = !!(cp && Array.isArray(cp.sources) && cp.sources.length);
   const othersCount = hasCP ? cp.sources.reduce((s, x) => s + (x.items || []).length, 0) : 0;
-  const tabBar = hasCP
-    ? `<div class="tabs"><button class="tab on" data-tab="reels">&#128241; Instagram Reels <span class="tcount">${ds.reels.length}</span></button><button class="tab" data-tab="others">&#127760; Others <span class="tcount">${othersCount}</span></button></div>`
-    : "";
-  const mainBody = hasCP
-    ? `${tabBar}<div class="tabpanel" data-panel="reels">\n${cards}\n${quar}\n</div><div class="tabpanel hidden" data-panel="others">${crossPlatformSection(ds)}</div>`
-    : `${cards}\n${crossPlatformSection(ds)}\n${quar}`;
+  let mainBody;
+  if (hasInspo || hasCP) {
+    const tabDefs = [{ k: "reels", label: "&#128241; Instagram Reels", n: mainReels.length }];
+    if (hasInspo) tabDefs.push({ k: "inspo", label: "&#10024; Inspiration", n: inspoReels.length });
+    if (hasCP) tabDefs.push({ k: "others", label: "&#127760; Others", n: othersCount });
+    const tabBar = `<div class="tabs">${tabDefs.map((t, i) => `<button class="tab${i === 0 ? " on" : ""}" data-tab="${t.k}">${t.label} <span class="tcount">${t.n}</span></button>`).join("")}</div>`;
+    const panel = (k, inner, on) => `<div class="tabpanel${on ? "" : " hidden"}" data-panel="${k}">${inner}</div>`;
+    let panels = panel("reels", `${cards}\n${quar}`, true);
+    if (hasInspo) panels += panel("inspo", `${inspoNote}\n${inspoCards}`, false);
+    if (hasCP) panels += panel("others", crossPlatformSection(ds), false);
+    mainBody = `${tabBar}${panels}`;
+  } else {
+    mainBody = `${cards}\n${crossPlatformSection(ds)}\n${quar}`;
+  }
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Viral Radar — ${esc(ds.niche)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -208,6 +224,7 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 .tab:hover{color:var(--text)}.tab.on{color:var(--text);border-bottom-color:var(--red)}
 .tab .tcount{font-family:var(--mono);font-size:11px;color:var(--faint);background:var(--card-2);border:1px solid var(--border);border-radius:7px;padding:1px 7px}.tab.on .tcount{color:var(--red);border-color:var(--red-bd)}
 .tabpanel.hidden{display:none}.trends{margin-top:8px;border-top:0;padding-top:0}
+.offnote{margin:2px 0 22px;padding:12px 16px;background:var(--card-2);border:1px solid var(--border);border-left:3px solid #9678FF;border-radius:10px;color:var(--muted);font-size:13.5px;line-height:1.6}
 @media print{.tabs{display:none}.tabpanel.hidden{display:block!important}.trends{margin-top:44px;border-top:1px solid var(--border);padding-top:30px}}
 @media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}
 /* Print / PDF export: show ALL storyboard frames as a filmstrip and expand transcripts */

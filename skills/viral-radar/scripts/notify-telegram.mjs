@@ -94,7 +94,8 @@ export function topTrends(crossPlatform, n = 3) {
 export function formatDigest(dataset = {}, { top = 5, trends = 3, minPerHandle = 0 } = {}) {
   const label = dataset.label || dataset.niche || "niche";
   const date = String(dataset.generatedAt || "").slice(0, 10) || "—";
-  const reels = dataset.reels || [];
+  // Inspiration-lane reels are out-of-niche format references — keep them out of the niche digest.
+  const reels = (dataset.reels || []).filter((r) => r.trackingCategory !== "inspiration");
   const lines = [`🛰️ <b>Viral Radar — ${escapeHtml(label)}</b>`, escapeHtml(date)];
 
   // Top reels

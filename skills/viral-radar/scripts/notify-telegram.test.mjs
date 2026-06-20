@@ -131,6 +131,17 @@ test("formatDigest collapses a long under-floor list to a count", () => {
   assert.doesNotMatch(text, /Under 5\/handle: @c0/);
 });
 
+test("formatDigest excludes inspiration-lane reels from the top list + coverage", () => {
+  const d = { label: "n", generatedAt: "2026-06-18", reels: [
+    reel({ handle: "@onniche", rankScore: 50, hook: "on niche hook", url: "u1" }),
+    reel({ handle: "@alfie_dundas", rankScore: 99, hook: "comedy bit", url: "u2", trackingCategory: "inspiration" }),
+  ]};
+  const text = formatDigest(d, { top: 5 });
+  assert.match(text, /on niche hook/);
+  assert.doesNotMatch(text, /comedy bit/);      // excluded despite a higher rankScore
+  assert.doesNotMatch(text, /alfie_dundas/);     // and out of the coverage line
+});
+
 test("formatDigest handles empty reels and missing crossPlatform", () => {
   const text = formatDigest({ niche: "x", generatedAt: "2026-06-18T00:00:00Z", reels: [] });
   assert.match(text, /Viral Radar — x/);

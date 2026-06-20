@@ -25,12 +25,15 @@ competitors go in the normal `trackedHandles` lane instead.)
    we never want to surface an out-of-niche creator as a niche "discovery".
 4. **Synthesis** (SKILL.md Step 5): synthesize over
    `reels.filter((r) => r.trackingCategory !== "inspiration")` **only**. Inspiration reels stay in
-   `reels` (full library, ranked, rendered) but are not a source of `nicheSynthesis` /
-   `whatsWorking` / `topPatterns`.
-5. **Report** (`scripts/render-report.mjs`): an inspiration reel renders an `INSPIRATION · FORMAT`
-   badge (`.pill-inspo`, violet) next to the `REEL` pill so it reads as a cross-niche reference, not a
-   direct competitor.
-6. **Validation** (`scripts/validate.mjs`): `inspirationHandles`, if present, must be an array; a reel's
+   `reels` but are not a source of `nicheSynthesis` / `whatsWorking` / `topPatterns`.
+5. **Report** (`scripts/render-report.mjs`): inspiration reels render in their **own "✨ Inspiration" tab**
+   (renumbered 1..N, with a note), kept **out of the main "Instagram Reels" ranking and the stat-bar** —
+   a true off-niche column, not mixed into the niche ranking. They still carry the `INSPIRATION · FORMAT`
+   badge (`.pill-inspo`, violet). (Updated 2026-06-20 — Jameson wanted an off-niche *column*, not just a
+   badge in the main list; e.g. a comedy account's 11.7M-view reel must not top the AI ranking.)
+6. **Digest** (`scripts/notify-telegram.mjs`): inspiration reels are excluded from the Telegram digest's
+   top-N and per-channel coverage (it's a niche digest).
+7. **Validation** (`scripts/validate.mjs`): `inspirationHandles`, if present, must be an array; a reel's
    `trackingCategory`, if present, must be a known value (`"inspiration"`). Both are optional, so old
    datasets/configs validate unchanged.
 
