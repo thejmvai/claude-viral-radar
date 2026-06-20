@@ -45,6 +45,31 @@ test("aggregateCreators groups, excludes known handles, applies min-views, dedup
   assert.equal(out[0].bestViews, 800000);
 });
 
+test("discoveryScore penalizes single-hit creators (same reach, fewer niche reels)", () => {
+  const now = new Date("2026-06-18T00:00:00Z");
+  const oneHit = discoveryScore({ bestViews: 4_000_000, count: 1, latestDate: "2026-06-15" }, { now });
+  const multi = discoveryScore({ bestViews: 4_000_000, count: 3, latestDate: "2026-06-15" }, { now });
+  assert.ok(oneHit < multi); // identical reach, but a single niche reel is halved
+});
+
+test("aggregateCreators flags single-match off-niche giants and ranks them below qualified", () => {
+  const now = new Date("2026-06-18T00:00:00Z");
+  const reels = [
+    // off-niche giant caught on ONE Claude-tagged reel (the alfie_dundas case)
+    { id: "g1", handle: "alfie_dundas", views: 4_000_000, likes: 1, comments: 1, caption: "Claude made this video", date: "2026-06-15", url: "u" },
+    // genuine niche creator: two solid reels, far less reach
+    { id: "n1", handle: "realcreator", views: 200000, likes: 1, comments: 1, caption: "ai agents", date: "2026-06-14", url: "u" },
+    { id: "n2", handle: "realcreator", views: 150000, likes: 1, comments: 1, caption: "claude code", date: "2026-06-13", url: "u" },
+  ];
+  const out = aggregateCreators(reels, { minViews: 50000, now, minNicheReels: 2 });
+  const giant = out.find((c) => c.handle === "alfie_dundas");
+  const real = out.find((c) => c.handle === "realcreator");
+  assert.equal(giant.singleMatch, true);
+  assert.equal(real.singleMatch, false);
+  assert.equal(out[0].handle, "realcreator"); // qualified first despite 20x less reach
+  assert.ok(out.indexOf(real) < out.indexOf(giant));
+});
+
 test("resolveKey prefers env var", () => {
   assert.equal(resolveKey({ SCRAPECREATORS_API_KEY: "k123" }), "k123");
 });

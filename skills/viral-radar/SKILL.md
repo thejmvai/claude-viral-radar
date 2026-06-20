@@ -115,7 +115,7 @@ It searches `config.seedHashtags` on Instagram via the ScrapeCreators API, group
 - `viral-radar-out/discovery-<niche>.json` — ranked new creators, each with their best reel, view counts, and profile URL.
 - A console summary plus a ready-to-paste `/viral-competitor @h1 @h2 ...` line for the strongest finds.
 
-Surface the top 5-8 suggestions to the user and let them pick. **Do not auto-add** discovered handles — discovery suggests, the user decides with `/viral-competitor`. If no `SCRAPECREATORS_API_KEY` is configured, skip this step (print a one-line note that discovery needs the free key from https://app.scrapecreators.com) and continue.
+Surface the top 5-8 suggestions to the user and let them pick. **Do not auto-add** discovered handles — discovery suggests, the user decides with `/viral-competitor`. Creators with fewer than `config.discoveryMinNicheReels` (default 2) niche reels are flagged `singleMatch` (likely off-niche — caught on a single tagged reel, e.g. a comedy account whose one reel mentions "Claude"); they're score-penalized, ranked below qualified creators, and kept out of the ready-to-paste line. **Only surface `singleMatch` creators with an explicit "verify" caveat.** If no `SCRAPECREATORS_API_KEY` is configured, skip this step (print a one-line note that discovery needs the free key from https://app.scrapecreators.com) and continue.
 
 ---
 
