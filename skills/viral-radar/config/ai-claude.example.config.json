@@ -10,6 +10,7 @@
   "inspirationHandles": [],
   "discoveryEnabled": true,
   "discoveryMinViews": 50000,
+  "discoveryMinNicheReels": 2,
   "scrapeTargetPerHandle": 36,
   "minPerHandle": 5,
   "enrichmentCapPerRun": 60,

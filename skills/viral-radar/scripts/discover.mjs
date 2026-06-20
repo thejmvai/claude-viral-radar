@@ -62,15 +62,21 @@ export function parseReel(raw) {
   };
 }
 
-export function discoveryScore({ bestViews, count, latestDate }, { now = new Date(), halfLifeDays = 30 } = {}) {
+export function discoveryScore({ bestViews, count, latestDate }, { now = new Date(), halfLifeDays = 30, minNicheReels = 2 } = {}) {
   const views = clamp(Math.log10(Math.max(bestViews, 1)) / Math.log10(5_000_000), 0, 1); // 5M = full
   const presence = clamp(count / 3, 0, 1); // 3+ niche reels = full
   const rec = recencyScore(latestDate, now, halfLifeDays);
-  return Math.round(100 * (0.55 * views + 0.25 * presence + 0.2 * rec));
+  let score = 100 * (0.55 * views + 0.25 * presence + 0.2 * rec);
+  // A single tangential hit (one niche-tagged reel) shouldn't let raw reach float an off-niche giant up —
+  // e.g. a comedy account whose ONE reel mentions "Claude". Halve the score below the niche-reel floor.
+  if (count < minNicheReels) score *= 0.5;
+  return Math.round(score);
 }
 
-// Group deduped reels by creator, drop excluded/known handles, rank the rest.
-export function aggregateCreators(reels, { exclude = [], minViews = 50000, now = new Date(), halfLifeDays = 30 } = {}) {
+// Group deduped reels by creator, drop excluded/known handles, rank the rest. Creators with fewer than
+// `minNicheReels` niche reels are flagged `singleMatch` (likely off-niche — caught on one tagged reel) and
+// sorted below qualified creators so they're never auto-recommended.
+export function aggregateCreators(reels, { exclude = [], minViews = 50000, now = new Date(), halfLifeDays = 30, minNicheReels = 2 } = {}) {
   const excl = new Set(exclude.map(normHandle));
   const seen = new Set();
   const by = new Map();
@@ -94,11 +100,13 @@ export function aggregateCreators(reels, { exclude = [], minViews = 50000, now =
       bestViews: best.views,
       totalViews: rs.reduce((s, r) => s + r.views, 0),
       latestDate,
+      singleMatch: rs.length < minNicheReels,
       bestReel: { url: best.url, views: best.views, likes: best.likes, caption: best.caption.slice(0, 120), date: best.date },
-      score: discoveryScore(stats, { now, halfLifeDays }),
+      score: discoveryScore(stats, { now, halfLifeDays, minNicheReels }),
     });
   }
-  creators.sort((a, b) => b.score - a.score || b.bestViews - a.bestViews);
+  // qualified (>= minNicheReels) first, then single-match; each by score then reach.
+  creators.sort((a, b) => (a.singleMatch - b.singleMatch) || (b.score - a.score) || (b.bestViews - a.bestViews));
   return creators;
 }
 
@@ -140,6 +148,7 @@ async function main() {
     process.exit(1);
   }
   const minViews = Number(arg("min-views", cfg.discoveryMinViews ?? cfg.velocityThreshold ?? 50000));
+  const minNicheReels = Number(arg("min-niche-reels", cfg.discoveryMinNicheReels ?? 2));
 
   // exclude = tracked + inspiration handles + handles already in the dataset
   // (inspiration handles are out-of-niche on purpose — never surface them as niche discovery)
@@ -171,7 +180,7 @@ async function main() {
     all.push(...parsed);
   }
 
-  const creators = aggregateCreators(all, { exclude: [...exclude], minViews });
+  const creators = aggregateCreators(all, { exclude: [...exclude], minViews, minNicheReels });
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = arg("out", path.join(outDir, `discovery-${niche}.json`));
   fs.writeFileSync(outPath, JSON.stringify({ niche, generatedAt: new Date().toISOString(), minViews, hashtags, creators }, null, 2));
@@ -179,10 +188,18 @@ async function main() {
   console.log(`\nNew creators worth tracking (>= ${minViews.toLocaleString()} views), ${creators.length} found. Credits left: ${credits ?? "?"}\n`);
   const top = creators.slice(0, 15);
   for (const c of top) {
-    console.log(`  ${String(c.score).padStart(3)} @${c.handle.padEnd(22)} ${String(c.bestViews).padStart(10)} best · ${c.nicheReels} reel(s) · ${c.bestReel.caption.slice(0, 40)}`);
+    const flag = c.singleMatch ? " ⚠ verify (1 niche reel)" : "";
+    console.log(`  ${String(c.score).padStart(3)} @${c.handle.padEnd(22)} ${String(c.bestViews).padStart(10)} best · ${c.nicheReels} reel(s) · ${c.bestReel.caption.slice(0, 40)}${flag}`);
   }
-  if (top.length) {
-    console.log(`\nAdd the best with:\n  /viral-competitor ${top.slice(0, 8).map((c) => "@" + c.handle).join(" ")}`);
+  const qualified = creators.filter((c) => !c.singleMatch);
+  const single = creators.filter((c) => c.singleMatch);
+  if (qualified.length) {
+    console.log(`\nAdd the best with:\n  /viral-competitor ${qualified.slice(0, 8).map((c) => "@" + c.handle).join(" ")}`);
+  } else {
+    console.log(`\nNo confidently-niche creators this run (all had < ${minNicheReels} niche reels).`);
+  }
+  if (single.length) {
+    console.log(`\n⚠ Single-match (likely off-niche — caught on one tagged reel; verify before adding): ${single.slice(0, 8).map((c) => "@" + c.handle).join(" ")}`);
   }
   console.log(`\nFull list: ${outPath}`);
 }
