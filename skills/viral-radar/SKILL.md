@@ -50,6 +50,23 @@ All outputs are written under `viral-radar-out/` in the **user's current working
 
 ---
 
+## Step 1.5 — Choose the data source (ASK EVERY RUN)
+
+Before scraping, **always ask the user which data source to use** — the two paths differ in cost and speed, so the user decides each run:
+
+> "How do you want to pull this run?
+> **1) Paid (fast)** — ScrapeCreators API for the competitor reels (no Instagram throttle, exact metrics) **plus** `/last30days` for cross-platform 'Hot across the niche' trends. Costs ScrapeCreators credits.
+> **2) Free (slower)** — Chrome scraping through your logged-in Instagram. $0, but Instagram soft-blocks rapid scraping, so a full tracked list is paced and can take ~20-40 min and sometimes needs a cooldown + retry."
+
+Route on their answer:
+
+- **Paid →** run **Step 2 (paid API)** below (`scripts/scrape-api.mjs`). **SPEND GATE:** ScrapeCreators is paid — confirm the user is OK spending credits before the first live call (per CLAUDE.md). Then optionally pull trends in Step 6 via `/last30days` (skip with a one-line note if that skill isn't installed).
+- **Free →** run **Step 2 (no MCP)** below (`scripts/scrape-cdp.mjs`), or the MCP path (Step 2) if the chrome-devtools MCP is connected. **Set the delay expectation up front** and follow the throttle discipline in `workflows/scrape-cdp.md` (pace with `--gap`, do **not** probe-then-immediately-full-run, and if many handles come back `throttled` stop and retry after a cooldown).
+
+Both paths write the **same** `viral-radar-out/worklist-<niche>.json` shape, so Step 3 enrichment onward is identical regardless of which source the user picked.
+
+---
+
 ## Step 2 — Tier 1 Detection (per tracked handle)
 
 For each handle in `config.trackedHandles`:
@@ -99,6 +116,31 @@ CDP scraper instead. Workflow SOP: `workflows/scrape-cdp.md`.
 This removes the MCP dependency and is the spine for unattended/scheduled refreshes. Browser scraping
 still gets fragile engagement (IG hides like counts), so ScrapeCreators/Apify remain the high-fidelity
 alternatives.
+
+---
+
+## Step 2 (paid API) — ScrapeCreators reels (the "paid (fast)" path)
+
+The fast alternative to chrome scraping, chosen in Step 1.5. It pulls each tracked handle's reels
+straight from the ScrapeCreators `user/reels` endpoint — **no browser, no Instagram throttle**, exact
+engagement. Workflow SOP: `workflows/scrape-api.md`. **SPEND GATE: this costs ScrapeCreators credits —
+confirm before the first live call.**
+
+1. Ensure `SCRAPECREATORS_API_KEY` resolves (env, `./.claude/last30days.env`, or `~/.config/last30days/.env`).
+2. Run:
+   ```
+   node scripts/scrape-api.mjs --niche=<niche>
+   ```
+   It iterates `config.trackedHandles` **plus `config.inspirationHandles`** (same lanes as the chrome
+   path), fetches each handle's reels, applies the same viral gate (`viralReasonFor`/`isViral`) and
+   metrics (`score.mjs`) via the shared `buildWorklistItem`, and writes the **work-list** to
+   `viral-radar-out/worklist-<niche>.json`. Inspiration reels carry `trackingCategory: "inspiration"`.
+3. Read `worklist-<niche>.json` and **continue at Step 3 enrichment unchanged** — the item shape is
+   identical to the chrome path's.
+
+Then add cross-platform trends (the other half of the "paid (fast)" choice): in Step 6, run
+`/last30days <niche>` and attach the result as `crossPlatform` (skip with a one-line note if `/last30days`
+isn't installed).
 
 ---
 
@@ -229,7 +271,9 @@ Turn the radar into reel ideas. Workflow SOP: `workflows/ideator.md`. **GATE: id
 
 ## Scope notes
 
-- **Tracked-handle scraping** (Step 2) is the spine: it runs via the chrome-devtools browser, no API key needed.
+- **Data source is the user's choice every run (Step 1.5):** *free* chrome scraping (Step 2 / Step 2 no-MCP) or *paid* ScrapeCreators reels (Step 2 paid API). Both produce the same work-list; the rest of the pipeline is identical.
+- **Tracked-handle scraping** (Step 2, free) is the spine: it runs via the chrome-devtools browser / raw CDP, no API key needed, but Instagram soft-blocks rapid bursts (pace it — see `workflows/scrape-cdp.md`).
+- **Paid reel scrape** (Step 2 paid API): `scripts/scrape-api.mjs` pulls reels via the ScrapeCreators `user/reels` endpoint — fast, no IG throttle, costs credits. Spend-gated.
 - **Discovery** (Step 2.5) is optional and additive: it finds NEW creators by hashtag via the ScrapeCreators API. Enable with `discoveryEnabled: true` plus a `SCRAPECREATORS_API_KEY`. Discovery only *suggests* handles; the user adds the good ones with `/viral-competitor`.
 
 ---
@@ -240,5 +284,5 @@ Turn the radar into reel ideas. Workflow SOP: `workflows/ideator.md`. **GATE: id
 - **chrome-devtools MCP** — for Instagram scraping (Step 2). Or skip it: use **Step 2 (no MCP)** with `scripts/scrape-cdp.mjs` + a Chrome launched on `--remote-debugging-port=9222` (dependency-free, no MCP).
 - **yt-dlp** + **ffmpeg** on PATH — for media extraction
 - **Whisper** (optional) — `pip install openai-whisper` — or set `GROQ_API_KEY` / `OPENAI_API_KEY` for cloud transcription
-- **ScrapeCreators API key** (optional) — powers Step 2.5 discovery; free tier at https://app.scrapecreators.com, set `SCRAPECREATORS_API_KEY`
+- **ScrapeCreators API key** (optional) — powers Step 2.5 discovery **and the paid Step 2 reel scrape** (`scripts/scrape-api.mjs`); free tier at https://app.scrapecreators.com, set `SCRAPECREATORS_API_KEY`. Paid calls are spend-gated.
 - **nexlev MCP** (optional) — fallback enrichment when local media extraction fails

@@ -72,6 +72,17 @@ If a selector breaks, fix it here and note the working selector + date below.
   loaded but grid empty`) in the work-list + a `⚠` summary line. **For the full tracked list (27 handles)
   this matters a lot** — keep `--gap` generous, and if many handles come back `throttled`, stop and re-run
   later (the cooldown is minutes+). The very first request of a fresh session reliably returns the full grid.
+- **Don't probe-then-immediately-full-run (learned 2026-06-24).** Running a one-handle health probe and
+  then kicking off the full list right after burns that "first request of a fresh session" grace on the
+  probe, and the back-to-back burst trips the throttle on the very next handle. If you must probe, treat
+  the probe AS the start of the run, or wait out a cooldown before the full run.
+- **A short cooldown may not clear a multi-burst block (learned 2026-06-24).** After two back-to-back full
+  attempts, an 8-min cooldown + a bigger `--gap=12000` was NOT enough — handles that returned a full grid
+  minutes earlier (e.g. `aliabdaal`) came back header-only. A sticky block from repeated bursts needs a
+  much longer rest (tens of minutes, or come back later). When this happens, **stop** (repeated automated
+  hits deepen the block and risk the account) and retry on the next run or scrape in small batches with
+  long pauses. Read scraping uses the user's logged-in IG session, so every profile visited also nudges
+  their real feed/algorithm toward those creators. The paid `scrape-api.mjs` path avoids all of this.
 - **Quoting `--remote-allow-origins=*`:** in zsh the `*` must be quoted (`"--remote-allow-origins=*"`) or
   the shell glob-expands it and Chrome never gets the flag.
 - **Raw CDP proves fiddly?** Fallback documented: `npm i chrome-remote-interface` + a `package.json` in the
