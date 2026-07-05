@@ -56,6 +56,17 @@ export function claudeArgv(prompt, { model = "", skipPermissions = true } = {}) 
   return argv;
 }
 
+// yt-dlp needs an Instagram-authenticated browser's cookies to download reel media (IG gates media
+// behind login). The headless enrich step inherits this env; default to the user's main Chrome profile
+// (live-verified working) — override with --ytdlp-cookies= or the VR_YTDLP_* vars already in the env.
+export function childEnv(base = {}, cookiesFromBrowser = "chrome") {
+  const env = { ...base };
+  if (!env.VR_YTDLP_COOKIES_FROM_BROWSER && !env.VR_YTDLP_COOKIES_FILE && cookiesFromBrowser) {
+    env.VR_YTDLP_COOKIES_FROM_BROWSER = cookiesFromBrowser;
+  }
+  return env;
+}
+
 export async function chromeReachable(port = 9222, fetchImpl = fetch) {
   try {
     const res = await fetchImpl(`http://127.0.0.1:${port}/json/version`);
@@ -79,6 +90,9 @@ function arg(name, def = null) {
   if (hit) return hit.split("=").slice(1).join("=");
   return process.argv.includes(`--${name}`) ? true : def;
 }
+// A bare `--flag` (no =value) makes arg() return true; coerce value-flags to strings so a bare
+// `--handles` can't silently become the literal handle "true" downstream.
+const argStr = (name, def = "") => { const v = arg(name, def); return v === true || v == null ? def : String(v); };
 
 async function ensureChrome(port, profile, chromeBin) {
   if (await chromeReachable(port)) return true;
@@ -93,23 +107,24 @@ async function ensureChrome(port, profile, chromeBin) {
 }
 
 // Run a subprocess to completion (stdout/stderr inherited). Resolves with the exit code.
-function run(bin, argv, cwd) {
+function run(bin, argv, cwd, env = process.env) {
   return new Promise((resolve) => {
-    const child = spawn(bin, argv, { cwd, stdio: ["ignore", "inherit", "inherit"] });
+    const child = spawn(bin, argv, { cwd, env, stdio: ["ignore", "inherit", "inherit"] });
     child.on("exit", (code) => resolve(code ?? 1));
     child.on("error", (e) => { console.error(`spawn ${bin} failed:`, e.message); resolve(127); });
   });
 }
 
 async function main() {
-  const niche = arg("niche", "ai-claude");
-  const port = Number(arg("port", 9222));
-  const projectDir = arg("project-dir", process.cwd());
-  const handles = arg("handles", "");
-  const profile = arg("profile", path.join(os.homedir(), ".viral-radar-chrome"));
-  const model = arg("model", "");
-  const chromeBin = arg("chrome-bin", process.env.CHROME_BIN || DEFAULT_CHROME_MAC);
-  const claudeBin = arg("claude-bin", process.env.CLAUDE_BIN || "claude");
+  const niche = argStr("niche", "ai-claude");
+  const port = Number(argStr("port", "9222")) || 9222;
+  const projectDir = argStr("project-dir", process.cwd());
+  const handles = argStr("handles", "");
+  const profile = argStr("profile", path.join(os.homedir(), ".viral-radar-chrome"));
+  const model = argStr("model", "");
+  const chromeBin = argStr("chrome-bin", process.env.CHROME_BIN || DEFAULT_CHROME_MAC);
+  const claudeBin = argStr("claude-bin", process.env.CLAUDE_BIN || "claude");
+  const ytdlpCookies = argStr("ytdlp-cookies", "chrome"); // IG media downloads need auth cookies
   const worklistRel = path.join("viral-radar-out", `worklist-${niche}.json`);
 
   console.log(`[refresh] niche=${niche} port=${port} dir=${projectDir}${handles ? ` handles=${handles}` : ""}`);
@@ -133,9 +148,11 @@ async function main() {
   }
 
   // Steps 3–7.5 — bounded agent work on the ready work-list (enrich → rank → render → digest).
+  // childEnv wires the yt-dlp cookie source through — without it every media download hits
+  // Instagram's "login required" wall and enrichment silently degrades to partial records.
   const argv = claudeArgv(claudeEnrichPrompt(niche, worklistRel), { model });
   console.log(`[refresh] enriching + rendering + digest via ${claudeBin} -p …`);
-  const code = await run(claudeBin, argv, projectDir);
+  const code = await run(claudeBin, argv, projectDir, childEnv(process.env, ytdlpCookies));
   if (code !== 0) {
     await alert(`🛰️ Viral Radar refresh failed (claude exited ${code}). Check ${path.join(projectDir, "viral-radar-out/refresh.log")}.`);
     console.error(`claude exited ${code}`);

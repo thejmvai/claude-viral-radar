@@ -65,3 +65,9 @@ isolated for easy fixing:
 ## Wire-in
 SKILL.md Step 1.5 (data-source chooser) routes the "paid (fast)" choice here; SKILL.md "Step 2 (paid API)"
 documents the run. Free path stays `workflows/scrape-cdp.md`.
+
+## Failure surfacing (2026-07-05)
+`fetchUserReels` now backs off between retries and reports the API's own error (e.g. "insufficient
+credits") per handle instead of a generic "fetch failed" — an out-of-credits run no longer looks like
+"0 new reels". Same for discovery's `searchHashtag` (plus a 1.2s gap between hashtag calls; the search
+endpoint 429s under bursts).

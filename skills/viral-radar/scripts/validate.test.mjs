@@ -52,3 +52,10 @@ test("reel trackingCategory is optional; a bad value is reported, a good one pas
   const bad = { ...ds, reels: [{ ...reel, trackingCategory: "bogus" }] };
   assert.ok(validateDataset(bad).some((e) => e.includes("invalid trackingCategory")));
 });
+
+test("quarantined reels do not require rank (they are never ranked); gate reels still do", () => {
+  const { rank, ...noRank } = reel;
+  const base = { niche: "n", generatedAt: "t", nicheSynthesis: { whatsWorking: [], topPatterns: [], summary: "" } };
+  assert.deepEqual(validateDataset({ ...base, reels: [], quarantined: [noRank] }), []);
+  assert.ok(validateDataset({ ...base, reels: [noRank], quarantined: [] }).some((e) => e.includes("missing rank")));
+});

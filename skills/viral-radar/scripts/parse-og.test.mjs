@@ -32,3 +32,9 @@ test("parses exact small counts", () => {
   assert.equal(r.likes, 842);
   assert.equal(r.comments, 26);
 });
+
+test("parseCount parses B-suffix counts (billion-view reels parsed as ~1 view before)", () => {
+  assert.equal(parseCount("1.2B"), 1200000000);
+  assert.equal(parseCount("2b views"), 2000000000);
+  assert.equal(parseCount("3.5M"), 3500000); // control
+});

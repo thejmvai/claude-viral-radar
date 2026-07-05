@@ -15,8 +15,8 @@ Find viral reels in your niche in instagram from the competitors you choose. Run
 
 The installer then sets up automatically:
 
-- **chrome-devtools MCP** — drives the automation browser for Instagram scraping (`claude mcp add chrome-devtools …`)
-- **yt-dlp** + **ffmpeg** — download reels and extract storyboard frames
+- **chrome-devtools MCP** (optional) — one way to drive the scraping browser; the skill also runs MCP-free via a debug Chrome (`scripts/scrape-cdp.mjs`) or the paid ScrapeCreators path (`claude mcp add chrome-devtools …`)
+- **yt-dlp** + **ffmpeg** — download reels and extract storyboard frames. Instagram now requires a logged-in session for media downloads: keep a browser profile signed into Instagram and set `VR_YTDLP_COOKIES_FROM_BROWSER=chrome` when enriching by hand (the scheduled refresh sets it automatically)
 - **last30days skill** — niche trend research, fetched from its [upstream repo](https://github.com/mvanhorn/last30days-skill)
 
 Optional (not installed automatically):

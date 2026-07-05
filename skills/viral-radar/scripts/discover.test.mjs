@@ -73,3 +73,17 @@ test("aggregateCreators flags single-match off-niche giants and ranks them below
 test("resolveKey prefers env var", () => {
   assert.equal(resolveKey({ SCRAPECREATORS_API_KEY: "k123" }), "k123");
 });
+
+test("searchHashtag retries with backoff and surfaces the API error instead of a silent zero", async () => {
+  const { searchHashtag } = await import("./discover.mjs");
+  let calls = 0;
+  const failing = async () => { calls++; return { status: 429, json: async () => ({ success: false, message: "rate limited" }) }; };
+  const r = await searchHashtag("claude", "k", { attempts: 2, fetchImpl: failing, waitMs: 0 });
+  assert.equal(calls, 2);
+  assert.deepEqual(r.reels, []);
+  assert.match(r.error, /rate limited/);
+  const okFetch = async () => ({ status: 200, json: async () => ({ success: true, reels: [{ id: 1 }], credits_remaining: 9 }) });
+  const ok = await searchHashtag("claude", "k", { fetchImpl: okFetch });
+  assert.equal(ok.reels.length, 1);
+  assert.equal(ok.error, null);
+});

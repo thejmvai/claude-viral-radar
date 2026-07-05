@@ -4,6 +4,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const fmt = (n) => Number(n).toLocaleString("en-US");
 const compactNum = (n) => {
   const v = Number(n) || 0;
+  if (v >= 1e9) return (v / 1e9).toFixed(v >= 1e10 ? 0 : 1).replace(/\.0$/, "") + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
   if (v >= 1e3) return (v / 1e3).toFixed(v >= 1e5 ? 0 : 1).replace(/\.0$/, "") + "K";
   return String(v);
@@ -32,12 +33,16 @@ const CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const BOLT = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>';
 
 function reelCard(r, framesBaseUrl, resolveFrame) {
+  // Defensive: a single partial reel (failed enrichment) must not kill the whole report render.
+  const mt = r.metrics || {};
   const sb = r.storyboard || [];
   const frameUrl = (f) => (typeof resolveFrame === "function" ? resolveFrame(f.frame) : `${framesBaseUrl}${esc(f.frame)}`);
   const frames = sb
     .map((f, n) => `<img class="frm${n === 0 ? " on" : ""}" src="${frameUrl(f)}" data-role="${esc(f.role || "")}" data-ts="${esc(f.timestamp || "")}" data-cap="${esc(f.caption || "")}" alt="storyboard frame">`)
     .join("");
-  const navBtns = sb.length > 1 ? `<button class="nav prev" aria-label="previous frame"></button><button class="nav next" aria-label="next frame"></button>` : "";
+  const navBtns = sb.length > 1 ? `<button class="nav prev" aria-label="previous frame"><span class="chev">&#10094;</span></button><button class="nav next" aria-label="next frame"><span class="chev">&#10095;</span></button>` : "";
+  const dots = sb.length > 1 ? `<div class="dots">${sb.map((f, n) => `<i class="${n === 0 ? "on" : ""}" title="${esc(f.role || "")}"></i>`).join("")}</div>` : "";
+  const stepHint = sb.length > 1 ? `<div class="stephint">${sb.map((f) => esc(f.role || "")).filter(Boolean).join(" &rarr; ")}</div>` : "";
   // 0/1/2s hook frames (the literal first seconds), shown above the hook line when captured.
   const hf = r.hookFrames || [];
   const hookStrip = hf.length
@@ -47,28 +52,29 @@ function reelCard(r, framesBaseUrl, resolveFrame) {
   <div class="reel">
     <div class="left">
       <div class="rank">#${r.rank}</div>
-      <div class="stage">${frames}<span class="role"></span><span class="ts"></span><span class="fcount">1 / ${sb.length || 1}</span>${navBtns}</div>
+      <div class="stage">${frames}<span class="role"></span><span class="ts"></span><span class="fcount">1 / ${sb.length || 1}</span>${navBtns}${dots}</div>
+      ${stepHint}
       <div class="cap"><b class="cr"></b> <span class="cc"></span></div>
       <a class="igbtn" href="${esc(r.url)}" target="_blank" rel="noopener">Open on Instagram <span class="ic">&#8599;</span></a>
     </div>
     <div class="right">
       <div class="who"><h2>${esc(r.handle)}</h2><span class="pill-reel">REEL</span>${r.trackingCategory === "inspiration" ? '<span class="pill-inspo">INSPIRATION &middot; FORMAT</span>' : ""}</div>
       <div class="chips">
-        ${chip(EYE, fmt(r.metrics.views), "eye")}
-        ${chip(HEART, fmt(r.metrics.likes), "heart")}
-        ${chip(FIRE, `${r.breakout}× breakout`, "hot")}
-        ${chip(CMT, fmt(r.metrics.comments), "cmt")}
+        ${chip(EYE, fmt(mt.views ?? 0), "eye")}
+        ${chip(HEART, fmt(mt.likes ?? 0), "heart")}
+        ${chip(FIRE, `${r.breakout ?? 0}× breakout`, "hot")}
+        ${chip(CMT, fmt(mt.comments ?? 0), "cmt")}
         ${chip(CLOCK, [esc(r.postedAt), ageLabel(r.postedAt)].filter(Boolean).join(" · "), "date")}
         ${r.rankScore != null ? chip(BOLT, `${r.rankScore} rank · ${r.signalScore} signal`, "score") : ""}
       </div>
       <div class="qrow">
-        <span><b>${(r.likeRate * 100).toFixed(1)}%</b> like-rate <span class="organic">${r.ctaType === "organic" ? "organic" : "CTA-gated"}</span></span>
-        <span><b>${(r.commentRate * 100).toFixed(1)}%</b> comment-rate</span>
+        <span><b>${((r.likeRate || 0) * 100).toFixed(1)}%</b> like-rate <span class="organic">${r.ctaType === "organic" ? "organic" : "CTA-gated"}</span></span>
+        <span><b>${((r.commentRate || 0) * 100).toFixed(1)}%</b> comment-rate</span>
       </div>
-      <div class="sec"><div class="seclabel">Hook &middot; ${esc(r.hookDelivery.replace("+", " + "))}</div>${hookStrip}<div class="hook">&ldquo;${esc(r.hook)}&rdquo;</div></div>
+      <div class="sec"><div class="seclabel">Hook &middot; ${esc(String(r.hookDelivery || "").replace("+", " + "))}</div>${hookStrip}<div class="hook">&ldquo;${esc(r.hook)}&rdquo;</div></div>
       <div class="sec"><div class="seclabel">Format</div><span class="ftag">${esc(r.format)}</span></div>
       <div class="sec"><div class="seclabel">Breakdown</div><div class="breakdown">${esc(r.breakdown)}</div></div>
-      <details class="tx"><summary><span class="lft"><span class="tri">&#9656;</span> Transcript</span><button class="copybtn" data-tx="${esc(r.transcript)}">Copy</button></summary><div class="tx-body">${esc(r.transcript).replace(/\n/g, "<br>")}</div></details>
+      <details class="tx"><summary><span class="lft"><span class="tri">&#9656;</span> Transcript</span><button class="copybtn">Copy</button></summary><div class="tx-body">${esc(r.transcript).replace(/\n/g, "<br>")}</div></details>
       <div class="why"><div class="seclabel">Why it worked</div><p>${esc(r.whyItWorks)}</p></div>
     </div>
   </div>`;
@@ -133,18 +139,21 @@ function ideasSection(ideas) {
 }
 
 export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
-  const plays = ds.nicheSynthesis.whatsWorking.map((p, i) => `<div class="play"><b>0${i + 1}</b><span>${esc(p)}</span></div>`).join("");
+  const ns = ds.nicheSynthesis || {};
+  const allReels = ds.reels || [];
+  const quarList = ds.quarantined || [];
+  const plays = (ns.whatsWorking || []).map((p, i) => `<div class="play"><b>0${i + 1}</b><span>${esc(p)}</span></div>`).join("");
   // Split the inspiration lane out of the main ranking — its own tab, renumbered per lane, kept out of the
   // niche ranking/digest. Inspiration reels stay in ds.reels (tagged trackingCategory:"inspiration").
   const isInspo = (r) => r.trackingCategory === "inspiration";
-  const mainReels = ds.reels.filter((r) => !isInspo(r)).map((r, i) => ({ ...r, rank: i + 1 }));
-  const inspoReels = ds.reels.filter(isInspo).map((r, i) => ({ ...r, rank: i + 1 }));
+  const mainReels = allReels.filter((r) => !isInspo(r)).map((r, i) => ({ ...r, rank: i + 1 }));
+  const inspoReels = allReels.filter(isInspo).map((r, i) => ({ ...r, rank: i + 1 }));
   const hasInspo = inspoReels.length > 0;
   const cards = mainReels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
   const inspoCards = inspoReels.map((r) => reelCard(r, framesBaseUrl, resolveFrame)).join("\n");
   const inspoNote = `<div class="offnote">Inspiration lane &mdash; out-of-niche creators tracked for hook/format craft, not niche signal. Kept out of the main ranking, synthesis, and digest.</div>`;
-  const quar = ds.quarantined.length
-    ? `<div class="quarantine"><div class="seclabel">Boosted / low-signal, excluded from lessons</div>${ds.quarantined.map((r) => `<div class="qline">${esc(r.handle)} &middot; ${fmt(r.metrics.views)} views &middot; <b>${(r.likeRate * 100).toFixed(3)}%</b> like-rate</div>`).join("")}</div>`
+  const quar = quarList.length
+    ? `<div class="quarantine"><div class="seclabel">Boosted / low-signal, excluded from lessons</div>${quarList.map((r) => `<div class="qline">${esc(r.handle)} &middot; ${fmt((r.metrics || {}).views ?? 0)} views &middot; <b>${((r.likeRate || 0) * 100).toFixed(3)}%</b> like-rate</div>`).join("")}</div>`
     : "";
   const channels = new Set(mainReels.map((r) => r.handle)).size;
   const sub = `${mainReels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
@@ -175,18 +184,20 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
 <style>${REPORT_CSS}</style></head>
 <body><div class="wrap"><div class="pglabel">Viral Radar &middot; ${esc(ds.label || ds.niche)}</div><div class="pgsub">${sub}</div>
 ${statBar(ds)}
-<div class="synth"><h2>Top replicable plays</h2><div class="plays">${plays}</div><div class="gatenote">${esc(ds.nicheSynthesis.summary)}</div></div>
+<div class="synth"><h2>Top replicable plays</h2><div class="plays">${plays}</div><div class="gatenote">${esc(ns.summary || "")}</div></div>
 ${mainBody}
 </div>
 <script>
-document.querySelectorAll(".copybtn").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();navigator.clipboard.writeText(b.getAttribute("data-tx")||"");var t=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=t;},1500);});});
+document.querySelectorAll(".copybtn").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();var d=b.closest("details");var body=d?d.querySelector(".tx-body"):null;navigator.clipboard.writeText(body?body.innerText:"");var t=b.textContent;b.textContent="Copied";setTimeout(function(){b.textContent=t;},1500);});});
 document.querySelectorAll(".reel").forEach(function(reel){
   var stage=reel.querySelector(".stage"); if(!stage) return;
   var imgs=stage.querySelectorAll(".frm"); if(!imgs.length) return;
   var roleEl=stage.querySelector(".role"), tsEl=stage.querySelector(".ts"), cntEl=stage.querySelector(".fcount");
+  var dotsEl=stage.querySelectorAll(".dots i");
   var crEl=reel.querySelector(".cap .cr"), ccEl=reel.querySelector(".cap .cc"), i=0;
   function show(n){ i=(n+imgs.length)%imgs.length;
     imgs.forEach(function(im,k){im.classList.toggle("on",k===i);});
+    dotsEl.forEach(function(d,k){d.classList.toggle("on",k===i);});
     var a=imgs[i];
     if(roleEl) roleEl.textContent=a.dataset.role||"";
     if(tsEl) tsEl.textContent=a.dataset.ts||"";
@@ -217,7 +228,11 @@ const REPORT_CSS = `
 .rank{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;color:#fff;background:linear-gradient(140deg,#FF9A5A,#FF4D6A);margin-bottom:16px}
 .stage{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:9/16;background:#000;user-select:none}.stage .frm{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}.stage .frm.on{display:block}
 .role{position:absolute;left:10px;top:10px;font-size:11px;font-weight:600;color:#fff;background:rgba(255,77,106,.92);padding:2px 9px;border-radius:7px;z-index:2}.ts{position:absolute;left:10px;bottom:10px;font-family:var(--mono);font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:2px 8px;border-radius:7px;z-index:2}
-.nav{position:absolute;top:0;height:100%;width:50%;border:0;background:transparent;cursor:pointer;z-index:3}.nav.prev{left:0}.nav.next{right:0}
+.nav{position:absolute;top:0;height:100%;width:50%;border:0;background:transparent;cursor:pointer;z-index:3;display:flex;align-items:center;opacity:.92;transition:opacity .15s}.nav.prev{left:0;justify-content:flex-start;padding-left:8px}.nav.next{right:0;justify-content:flex-end;padding-right:8px}.nav:hover{opacity:1}
+.nav .chev{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:14px;line-height:1;box-shadow:0 1px 5px rgba(0,0,0,.45)}.nav:hover .chev{background:rgba(255,77,106,.95);transform:scale(1.08)}.nav.next .chev{animation:nudge 1.8s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}
+.dots{position:absolute;left:0;right:0;bottom:10px;display:flex;gap:5px;justify-content:center;z-index:4;pointer-events:none}.dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.5);transition:all .15s}.dots i.on{background:#fff;width:16px;border-radius:3px}
+.stephint{margin:8px 2px 0;font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;color:var(--faint);text-align:center;text-transform:uppercase}
 .fcount{position:absolute;right:10px;top:10px;font-family:var(--mono);font-size:11px;color:#fff;background:rgba(0,0,0,.6);padding:3px 9px;border-radius:8px;z-index:2}
 .cap{font-size:12px;color:var(--muted);text-align:center;margin-top:11px}.cap b{color:var(--red)}
 .igbtn{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;width:100%;background:var(--card-2);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:9px 18px;font-size:13px;text-decoration:none}.igbtn .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 30% 107%,#fce6a4,#f06748 44%,#cc3d92 60%,#4a64d8 92%)}
@@ -253,7 +268,7 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 @media print{
   .stage{aspect-ratio:auto;height:auto;background:transparent;display:flex;gap:4px}
   .stage .frm{position:static;display:block;width:24%;height:auto;aspect-ratio:9/16;border-radius:7px}
-  .role,.ts,.nav,.fcount{display:none!important}
+  .role,.ts,.nav,.fcount,.dots{display:none!important}
   details.tx>*:not(summary){display:block!important}
   details.tx summary .copybtn,details.tx summary .tri{display:none}
   .reel{break-inside:avoid;page-break-inside:avoid}

@@ -8,7 +8,7 @@
 import fs from "node:fs";
 
 export const hookWords = (hook) => String(hook || "").trim().split(/\s+/).filter(Boolean).length;
-const EM_DASH = /—/;
+const DASHES = /[—–]/; // em AND en dash — both read as AI tells in his voice
 
 // Assemble the evidence each idea must be grounded in: top on-niche reels, detected patterns, the
 // "what's working" plays, and cross-platform trends. Inspiration-lane reels are excluded (format
@@ -61,7 +61,10 @@ export function validateIdeas(ideas, { maxHookWords = 12 } = {}) {
     const g = idea.grounding;
     if (!g || !String(g.ref || "").trim()) errs.push(`${w} missing grounding.ref (every idea must cite a real radar/trend item)`);
     else if (g.type && !["reel", "trend", "pattern"].includes(g.type)) errs.push(`${w} grounding.type "${g.type}" invalid (reel|trend|pattern)`);
-    if (EM_DASH.test(idea.hook || "") || EM_DASH.test(idea.angle || "")) errs.push(`${w} contains an em dash (banned in his voice)`);
+    // Check every field that renders in the report, not just hook/angle.
+    for (const [fld, val] of [["hook", idea.hook], ["angle", idea.angle], ["format", idea.format], ["grounding.note", g && g.note]]) {
+      if (DASHES.test(String(val || ""))) errs.push(`${w} ${fld} contains an em/en dash (banned in his voice)`);
+    }
   });
   return errs;
 }

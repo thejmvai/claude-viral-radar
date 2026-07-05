@@ -62,7 +62,13 @@ test("validateIdeas catches missing fields, long hooks, bad grounding, em dashes
   assert.match(validateIdeas([{ ...goodIdea, format: "" }])[0], /missing format/);
   assert.match(validateIdeas([{ ...goodIdea, grounding: {} }])[0], /missing grounding.ref/);
   assert.match(validateIdeas([{ ...goodIdea, grounding: { ref: "x", type: "bogus" } }])[0], /invalid/);
-  assert.match(validateIdeas([{ ...goodIdea, angle: "this has an em dash — right here" }])[0], /em dash/);
+  assert.match(validateIdeas([{ ...goodIdea, angle: "this has an em dash — right here" }])[0], /em\/en dash/);
   assert.deepEqual(validateIdeas([]), ["ideas is empty"]);
   assert.deepEqual(validateIdeas("nope"), ["ideas is not an array"]);
+});
+
+test("validateIdeas bans dashes in every rendered field, en dash included", () => {
+  assert.match(validateIdeas([{ ...goodIdea, format: "Talking-head — screen demo" }])[0], /format contains an em\/en dash/);
+  assert.match(validateIdeas([{ ...goodIdea, grounding: { ...goodIdea.grounding, note: "range 5–10" } }])[0], /grounding\.note contains an em\/en dash/);
+  assert.match(validateIdeas([{ ...goodIdea, hook: "an en dash – hook" }])[0], /hook contains an em\/en dash/);
 });

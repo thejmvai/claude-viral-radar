@@ -86,17 +86,22 @@ export function buildHandleWorklist({ handle, reels = [], followers = null, cfg 
   return { handle: `@${h}`, followers: followers ?? null, fetched: reels.length, reels: out };
 }
 
-// --- network (live-gated) ----------------------------------------------------
-async function fetchUserReels(handle, key, { amount = 36, attempts = 3 } = {}) {
+// --- network (live-gated shape; retry/error logic unit-tested via fetchImpl) --
+// Backs off between attempts (the SC endpoints 429/500 under bursts) and keeps the LAST error so an
+// out-of-credits / bad-handle failure prints as itself instead of masquerading as "0 reels".
+export async function fetchUserReels(handle, key, { amount = 36, attempts = 3, fetchImpl = fetch, waitMs = 800 } = {}) {
   const url = `${SC_USER_REELS}?handle=${encodeURIComponent(handle)}&amount=${amount}`;
+  let error = null;
   for (let i = 0; i < attempts; i++) {
+    if (i) await new Promise((r) => setTimeout(r, waitMs * i));
     try {
-      const res = await fetch(url, { headers: { "x-api-key": key } });
+      const res = await fetchImpl(url, { headers: { "x-api-key": key } });
       const data = await res.json();
-      if (data && data.success !== false) return { data, credits: data.credits_remaining ?? null };
-    } catch {}
+      if (data && data.success !== false) return { data, credits: data.credits_remaining ?? null, error: null };
+      error = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+    } catch (e) { error = String(e.message || e); }
   }
-  return { data: null, credits: null };
+  return { data: null, credits: null, error };
 }
 
 // --- CLI ---------------------------------------------------------------------
@@ -105,10 +110,13 @@ function arg(name, def = null) {
   if (hit) return hit.split("=").slice(1).join("=");
   return process.argv.includes(`--${name}`) ? true : def;
 }
+// A bare `--flag` (no =value) makes arg() return true; coerce value-flags to strings so
+// e.g. a bare `--handles` can never feed a boolean into .split() (it crashed before).
+const argStr = (name, def = "") => { const v = arg(name, def); return v === true || v == null ? def : String(v); };
 
 async function main() {
   const outDir = "viral-radar-out";
-  let niche = arg("niche");
+  let niche = argStr("niche");
   if (!niche) {
     const cfgs = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter((f) => f.endsWith(".config.json")) : [];
     niche = cfgs[0] ? cfgs[0].replace(".config.json", "") : "ai-claude";
@@ -117,7 +125,7 @@ async function main() {
   if (!fs.existsSync(cfgPath)) { console.error(`No config at ${cfgPath}.`); process.exit(1); }
   const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
 
-  const explicit = (arg("handles") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const explicit = argStr("handles").split(",").map((s) => s.trim()).filter(Boolean);
   const scrapeList = resolveScrapeList(cfg, explicit); // tracked + inspiration lanes, category-tagged
   if (!scrapeList.length) { console.error("No trackedHandles. Add some with /viral-competitor."); process.exit(1); }
 
@@ -132,16 +140,16 @@ async function main() {
     process.exit(1);
   }
 
-  const target = Number(arg("target", cfg.scrapeTargetPerHandle ?? 36));
+  const target = Number(argStr("target")) || Number(cfg.scrapeTargetPerHandle ?? 36);
   const now = new Date();
   const perHandle = [];
   const allReels = [];
   let credits = null;
   for (const { handle, trackingCategory } of scrapeList) {
     process.stdout.write(`  @${handle}${trackingCategory === "inspiration" ? " (inspiration)" : ""} … `);
-    const { data, credits: c } = await fetchUserReels(handle, key, { amount: target });
+    const { data, credits: c, error } = await fetchUserReels(handle, key, { amount: target });
     if (c != null) credits = c;
-    if (!data) { perHandle.push({ handle: `@${handle}`, trackingCategory, kept: 0, error: "fetch failed" }); console.log("error: fetch failed"); continue; }
+    if (!data) { const why = error || "fetch failed"; perHandle.push({ handle: `@${handle}`, trackingCategory, kept: 0, error: why }); console.log(`error: ${why}`); continue; }
     const { followers, reels } = parseUserReelsResponse(data);
     const r = buildHandleWorklist({ handle, reels, followers, cfg, seen, now, trackingCategory });
     perHandle.push({ handle: r.handle, trackingCategory, kept: r.reels.length, fetched: r.fetched, followers: r.followers });
@@ -151,7 +159,7 @@ async function main() {
 
   const minPerHandle = Number(cfg.minPerHandle ?? 5);
   const underFloor = perHandle.filter((p) => (p.kept ?? 0) < minPerHandle).map((p) => p.handle);
-  const out = arg("out", path.join(outDir, `worklist-${niche}.json`));
+  const out = argStr("out", path.join(outDir, `worklist-${niche}.json`));
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(out, JSON.stringify({
     niche, source: "scrapecreators", scrapedAt: now.toISOString(), creditsRemaining: credits,

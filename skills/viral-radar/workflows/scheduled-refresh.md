@@ -56,3 +56,11 @@ instead (not built — would skip the Claude enrichment step).
 
 ## Wire-in
 Standalone (launchd-driven). Reuses the skill pipeline + `notify-telegram.mjs`; no SKILL.md step change.
+
+## Gotcha: Instagram gates media downloads behind login (2026-07-05)
+Enrichment's `extract-media.mjs` (yt-dlp) now needs an IG-authenticated browser's cookies or every
+download fails with "rate-limit reached or login required". `refresh.mjs` handles this: it passes
+`VR_YTDLP_COOKIES_FROM_BROWSER` (default `chrome`, override with `--ytdlp-cookies=`) into the headless
+enrich step's environment. Requirements: that browser profile must be logged into Instagram. Note the
+`~/.viral-radar-chrome` debug profile's session can go stale while the main Chrome profile stays fresh —
+live-verified 2026-07-05 (stale radar-profile cookies failed, default `chrome` worked), hence the default.

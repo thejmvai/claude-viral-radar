@@ -97,3 +97,17 @@ test("buildHandleWorklist computes creatorMedianViews across the handle's reels"
   // median of [100000, 300000, 500000] = 300000, applied to every item
   assert.equal(out.reels[0].creatorMedianViews, 300000);
 });
+
+test("fetchUserReels retries, surfaces the API error instead of a silent 'fetch failed'", async () => {
+  const { fetchUserReels } = await import("./scrape-api.mjs");
+  let calls = 0;
+  const failing = async () => { calls++; return { status: 402, json: async () => ({ success: false, message: "insufficient credits" }) }; };
+  const r = await fetchUserReels("h", "k", { attempts: 3, fetchImpl: failing, waitMs: 0 });
+  assert.equal(calls, 3);
+  assert.equal(r.data, null);
+  assert.match(r.error, /insufficient credits/);
+  const okFetch = async () => ({ status: 200, json: async () => ({ success: true, reels: [], credits_remaining: 41 }) });
+  const ok = await fetchUserReels("h", "k", { fetchImpl: okFetch });
+  assert.equal(ok.error, null);
+  assert.equal(ok.credits, 41);
+});
