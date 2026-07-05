@@ -8,9 +8,15 @@
 //
 // CLI: node scripts/notify-telegram.mjs [--niche=ai-claude] [--dataset=<path>]
 //        [--top=5] [--trends=3] [--min-per-handle=5] [--dry-run]
+import dns from "node:dns";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+// api.telegram.org publishes AAAA records; on machines with a broken IPv6 route Node's fetch
+// resolves IPv6 first and dies with ETIMEDOUT "fetch failed" while curl (which falls back to
+// IPv4) works. Prefer IPv4 — same effect as --dns-result-order=ipv4first, baked in.
+dns.setDefaultResultOrder("ipv4first");
 
 const TG_LIMIT = 4096;
 
