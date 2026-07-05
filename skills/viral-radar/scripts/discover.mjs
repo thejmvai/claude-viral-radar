@@ -12,6 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { recencyScore } from "./score.mjs";
+import { keywordHits } from "./relevance.mjs";
 
 const SC_BASE = "https://api.scrapecreators.com/v2/instagram/reels/search";
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -76,7 +77,10 @@ export function discoveryScore({ bestViews, count, latestDate }, { now = new Dat
 // Group deduped reels by creator, drop excluded/known handles, rank the rest. Creators with fewer than
 // `minNicheReels` niche reels are flagged `singleMatch` (likely off-niche — caught on one tagged reel) and
 // sorted below qualified creators so they're never auto-recommended.
-export function aggregateCreators(reels, { exclude = [], minViews = 50000, now = new Date(), halfLifeDays = 30, minNicheReels = 2 } = {}) {
+// When `keywords` (config.nicheKeywords) are provided, a reel only counts toward qualification if its
+// CAPTION actually matches the niche — that is what keeps off-niche giants (one tagged reel, huge reach)
+// out of the recommended line, instead of merely counting search hits.
+export function aggregateCreators(reels, { exclude = [], minViews = 50000, now = new Date(), halfLifeDays = 30, minNicheReels = 2, keywords = [] } = {}) {
   const excl = new Set(exclude.map(normHandle));
   const seen = new Set();
   const by = new Map();
@@ -92,15 +96,18 @@ export function aggregateCreators(reels, { exclude = [], minViews = 50000, now =
     const best = rs.reduce((a, b) => (b.views > a.views ? b : a), rs[0]);
     if (best.views < minViews) continue;
     const latestDate = rs.map((r) => r.date).filter(Boolean).sort().at(-1) || "";
-    const stats = { bestViews: best.views, count: rs.length, latestDate };
+    // Qualification counts caption-relevant reels when keywords are configured, raw matches otherwise.
+    const relevantReels = keywords.length ? rs.filter((r) => keywordHits(r.caption, keywords).length > 0).length : rs.length;
+    const stats = { bestViews: best.views, count: relevantReels, latestDate };
     creators.push({
       handle,
       profile: `https://www.instagram.com/${handle}/`,
       nicheReels: rs.length,
+      relevantReels,
       bestViews: best.views,
       totalViews: rs.reduce((s, r) => s + r.views, 0),
       latestDate,
-      singleMatch: rs.length < minNicheReels,
+      singleMatch: relevantReels < minNicheReels,
       bestReel: { url: best.url, views: best.views, likes: best.likes, caption: best.caption.slice(0, 120), date: best.date },
       score: discoveryScore(stats, { now, halfLifeDays, minNicheReels }),
     });
@@ -187,7 +194,7 @@ async function main() {
     all.push(...parsed);
   }
 
-  const creators = aggregateCreators(all, { exclude: [...exclude], minViews, minNicheReels });
+  const creators = aggregateCreators(all, { exclude: [...exclude], minViews, minNicheReels, keywords: cfg.nicheKeywords || [] });
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = arg("out", path.join(outDir, `discovery-${niche}.json`));
   fs.writeFileSync(outPath, JSON.stringify({ niche, generatedAt: new Date().toISOString(), minViews, hashtags, creators }, null, 2));

@@ -79,7 +79,7 @@ export function buildHandleWorklist({ handle, reels = [], followers = null, cfg 
     out.push(buildWorklistItem({
       shortcode: r.shortcode,
       views: r.views,
-      og: { likes: r.likes, comments: r.comments, postedAt: r.date || null },
+      og: { likes: r.likes, comments: r.comments, postedAt: r.date || null, caption: r.caption },
       handle: h, followers, creatorMedianViews, viralReason: reason, trackingCategory, now,
     }));
   }

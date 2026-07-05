@@ -69,12 +69,51 @@ export function validateIdeas(ideas, { maxHookWords = 12 } = {}) {
   return errs;
 }
 
-// CLI
+// Remix (the Blort "rescript a winner" concept): the deterministic context pack for remixing ONE
+// specific reel — its structural beats, hook mechanics, and why it worked — so the agent can rebuild
+// the same skeleton around Jameson's topic in his voice. The agent writes; this only assembles evidence.
+export function buildRemixContext(dataset = {}, shortcode) {
+  const r = [...(dataset.reels || []), ...(dataset.offTopic || [])].find((x) => x.shortcode === shortcode);
+  if (!r) return null;
+  return {
+    shortcode: r.shortcode,
+    handle: r.handle,
+    url: r.url,
+    metrics: r.metrics || {},
+    likeRate: r.likeRate ?? null,
+    commentRate: r.commentRate ?? null,
+    hook: r.hook || "",
+    hookDelivery: r.hookDelivery || "",
+    format: r.format || "",
+    ctaType: r.ctaType || "",
+    beats: (r.storyboard || []).map(({ timestamp, role, caption }) => ({ timestamp, role, caption })),
+    transcriptExcerpt: String(r.transcript || "").slice(0, 1500),
+    breakdown: r.breakdown || "",
+    whyItWorks: r.whyItWorks || "",
+    instruction:
+      "Remix this reel for Jameson: keep the beat structure (same roles, same pacing) and the hook MECHANIC, " +
+      "but swap the subject to his AI/Claude niche and write it strictly in his voice (voice.md: plain words, " +
+      "his devices, no em dashes, no fabricated numbers). Output: hook (<= 12 words), beat-by-beat script, " +
+      "on-screen text per beat, and a one-line note on what was kept from the original. DRAFT for review only.",
+  };
+}
+
+// CLI: node ideator.mjs <dataset.json>                      -> grounding pack
+//      node ideator.mjs <dataset.json> <ideas.json>          -> validate ideas
+//      node ideator.mjs <dataset.json> --remix=<shortcode>   -> remix context pack for one reel
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-  const [dsPath, ideasPath] = process.argv.slice(2);
-  if (!dsPath) { console.error("usage: node ideator.mjs <dataset.json> [ideas.json]"); process.exit(1); }
+  const args = process.argv.slice(2);
+  const remixFlag = args.find((a) => a.startsWith("--remix="));
+  const pos = args.filter((a) => !a.startsWith("--"));
+  const [dsPath, ideasPath] = pos;
+  if (!dsPath) { console.error("usage: node ideator.mjs <dataset.json> [ideas.json] [--remix=<shortcode>]"); process.exit(1); }
   const ds = JSON.parse(fs.readFileSync(dsPath, "utf8"));
-  if (ideasPath) {
+  if (remixFlag) {
+    const sc = remixFlag.split("=")[1];
+    const ctx = buildRemixContext(ds, sc);
+    if (!ctx) { console.error(`No reel ${sc} in the dataset.`); process.exit(1); }
+    console.log(JSON.stringify(ctx, null, 2));
+  } else if (ideasPath) {
     const ideas = JSON.parse(fs.readFileSync(ideasPath, "utf8")).ideas || [];
     const errs = validateIdeas(ideas);
     if (errs.length) { console.error(errs.join("\n")); process.exit(1); }

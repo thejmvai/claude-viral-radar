@@ -125,3 +125,32 @@ test("transcript is embedded once (copy reads the body; no data-tx duplication)"
   assert.doesNotMatch(html, /data-tx=/);
   assert.match(html, /line one<br>line two/);
 });
+
+test("analytics tab, radar picks, and off-topic section render when present", () => {
+  const rich = JSON.parse(JSON.stringify(ds));
+  rich.analytics = {
+    generatedAt: "x", onNicheCount: 1,
+    formats: [{ format: "talking-head + screen-demo", count: 1, medianViews: 1000000, avgSignal: 87, gateShare: 1 }],
+    cta: { gated: { count: 1, medianViews: 1000000, medianCommentRate: 0.04 }, organic: { count: 0, medianViews: 0, medianCommentRate: 0 } },
+    duration: [{ bucket: "<20s", count: 0, medianViews: 0 }],
+    creators: [{ handle: "@democreator", reels: 1, medianViews: 1000000, avgSignal: 87, avgBreakout: 9, bestFormat: "talking-head + screen-demo" }],
+    hooks: { avgWords: 5, questionShare: 0, spokenShare: 1 },
+  };
+  rich.recommendations = [{ handle: "newbie", profile: "https://www.instagram.com/newbie/", bestViews: 500000, relevantReels: 4 }];
+  rich.offTopic = [{ ...rich.reels[0], shortcode: "OffT1", handle: "@offy", hook: "gym motivation", nicheRelevance: { hits: 0, matched: [] } }];
+  const html = renderReport(rich, { framesBaseUrl: "" });
+  assert.match(html, /Analytics/);
+  assert.match(html, /Format leaderboard/);
+  assert.match(html, /Radar picks/);
+  assert.match(html, /@newbie/);
+  assert.match(html, /Off-topic \(viral, but not niche signal/);
+  assert.match(html, /@offy/);
+});
+
+test("an empty library renders a valid page (post-reset state)", () => {
+  const empty = { niche: "ai-claude", label: "AI / Claude", generatedAt: "2026-07-05",
+    nicheSynthesis: { whatsWorking: [], topPatterns: [], summary: "reset" }, reels: [], quarantined: [] };
+  const html = renderReport(empty, { framesBaseUrl: "" });
+  assert.match(html, /<!DOCTYPE html>/);
+  assert.match(html, /reset/);
+});

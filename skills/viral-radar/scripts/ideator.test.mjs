@@ -72,3 +72,18 @@ test("validateIdeas bans dashes in every rendered field, en dash included", () =
   assert.match(validateIdeas([{ ...goodIdea, grounding: { ...goodIdea.grounding, note: "range 5–10" } }])[0], /grounding\.note contains an em\/en dash/);
   assert.match(validateIdeas([{ ...goodIdea, hook: "an en dash – hook" }])[0], /hook contains an em\/en dash/);
 });
+
+test("buildRemixContext packs one reel's beats, hook mechanics, and voice instruction", async () => {
+  const { buildRemixContext } = await import("./ideator.mjs");
+  const ds2 = { reels: [{ shortcode: "R1", handle: "@a", url: "u", hook: "h", hookDelivery: "spoken", format: "f",
+    ctaType: "organic", metrics: { views: 1 }, transcript: "t".repeat(2000),
+    storyboard: [{ timestamp: "0:01", role: "Hook", caption: "c", frame: "x" }], breakdown: "b", whyItWorks: "w" }] };
+  const ctx = buildRemixContext(ds2, "R1");
+  assert.equal(ctx.shortcode, "R1");
+  assert.equal(ctx.beats.length, 1);
+  assert.equal(ctx.beats[0].role, "Hook");
+  assert.ok(!("frame" in ctx.beats[0]));
+  assert.equal(ctx.transcriptExcerpt.length, 1500);
+  assert.match(ctx.instruction, /voice\.md/);
+  assert.equal(buildRemixContext(ds2, "NOPE"), null);
+});

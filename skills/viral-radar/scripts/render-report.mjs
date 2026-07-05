@@ -122,6 +122,38 @@ function statBar(ds) {
   ].join("")}</div>`;
 }
 
+// "Radar picks": discovery's recommended creators — surfaced for a human decision, never auto-added.
+function recommendationsBlock(recs) {
+  if (!recs || !recs.length) return "";
+  const rows = recs.map((c) => {
+    const h = esc(String(c.handle || "").replace(/^@/, ""));
+    const why = [c.relevantReels != null ? `${c.relevantReels} niche reels` : "", c.bestViews ? `best ${compactNum(c.bestViews)} views` : ""].filter(Boolean).join(" · ");
+    return `<li><a href="${esc(c.profile || `https://www.instagram.com/${h}/`)}" target="_blank" rel="noopener">@${h}</a>${why ? ` <span class="tmetric">${esc(why)}</span>` : ""}${c.reason ? ` — ${esc(c.reason)}` : ""}</li>`;
+  }).join("");
+  return `<div class="tsrc recs"><div class="tsrc-h">🔎 Radar picks — consider tracking (add with /viral-competitor; never auto-added)</div><ul>${rows}</ul></div>`;
+}
+
+// Optional "📊 Analytics" tab from ds.analytics (built by scripts/analytics.mjs).
+function analyticsSection(a) {
+  if (!a || !a.onNicheCount) return "";
+  const t = (rows, cols) => `<table class="atable"><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
+  const fmts = t(a.formats.slice(0, 10).map((f) =>
+    `<tr><td>${esc(f.format)}</td><td>${f.count}</td><td>${compactNum(f.medianViews)}</td><td>${f.avgSignal}</td><td>${Math.round(f.gateShare * 100)}%</td></tr>`).join(""),
+    ["Format", "Reels", "Median views", "Avg signal", "Gated"]);
+  const creators = t(a.creators.slice(0, 15).map((c) =>
+    `<tr><td>${esc(c.handle)}</td><td>${c.reels}</td><td>${compactNum(c.medianViews)}</td><td>${c.avgSignal}</td><td>${c.avgBreakout}×</td><td>${esc(c.bestFormat)}</td></tr>`).join(""),
+    ["Creator", "Reels", "Median views", "Avg signal", "Breakout", "Best format"]);
+  const dur = t(a.duration.map((d) => `<tr><td>${esc(d.bucket)}</td><td>${d.count}</td><td>${compactNum(d.medianViews)}</td></tr>`).join(""), ["Length", "Reels", "Median views"]);
+  const cta = a.cta ? `<div class="qrow" style="margin:8px 0 20px"><span><b>${compactNum(a.cta.organic.medianViews)}</b> median views organic (${a.cta.organic.count})</span><span><b>${compactNum(a.cta.gated.medianViews)}</b> median views gated (${a.cta.gated.count})</span></div>` : "";
+  const hooks = a.hooks ? `<div class="qrow" style="margin:8px 0 20px"><span><b>${a.hooks.avgWords}</b> avg hook words</span><span><b>${Math.round(a.hooks.questionShare * 100)}%</b> question hooks</span><span><b>${Math.round(a.hooks.spokenShare * 100)}%</b> spoken hooks</span></div>` : "";
+  return `<div class="offnote">Computed over the ${a.onNicheCount} on-niche reels (inspiration + off-topic excluded) by scripts/analytics.mjs.</div>
+    <div class="seclabel">Format leaderboard</div>${fmts}
+    <div class="seclabel" style="margin-top:22px">Gate vs organic</div>${cta}
+    <div class="seclabel">Duration sweet spot</div>${dur}
+    <div class="seclabel" style="margin-top:22px">Creator scorecards</div>${creators}
+    ${hooks ? `<div class="seclabel" style="margin-top:22px">Hooks</div>${hooks}` : ""}`;
+}
+
 // Optional "Ideas" tab: on-voice reel ideas from the Ideator, each grounded in a real radar/trend item.
 function ideasSection(ideas) {
   if (!ideas || !ideas.length) return "";
@@ -156,28 +188,38 @@ export function renderReport(ds, { framesBaseUrl = "", resolveFrame } = {}) {
   const quar = quarList.length
     ? `<div class="quarantine"><div class="seclabel">Boosted / low-signal, excluded from lessons</div>${quarList.map((r) => `<div class="qline">${esc(r.handle)} &middot; ${fmt((r.metrics || {}).views ?? 0)} views &middot; <b>${((r.likeRate || 0) * 100).toFixed(3)}%</b> like-rate</div>`).join("")}</div>`
     : "";
+  const offTopicList = ds.offTopic || [];
+  const offT = offTopicList.length
+    ? `<div class="quarantine"><div class="seclabel">Off-topic (viral, but not niche signal &mdash; kept out of ranking + lessons)</div>${offTopicList.map((r) => `<div class="qline">${esc(r.handle)} &middot; ${fmt((r.metrics || {}).views ?? 0)} views &middot; ${esc(r.hook || r.shortcode || "")}${r.nicheRelevance ? ` &middot; <b>${r.nicheRelevance.hits} niche hits</b>` : ""}</div>`).join("")}</div>`
+    : "";
   const channels = new Set(mainReels.map((r) => r.handle)).size;
   const sub = `${mainReels.length} reels &middot; ${channels} channels &middot; sorted by recency-weighted signal`;
   const ideas = ds.ideas || [];
   const hasIdeas = ideas.length > 0;
+  const recs = ds.recommendations || [];
+  const hasRecs = recs.length > 0;
+  const an = ds.analytics;
+  const hasAnalytics = !!(an && an.onNicheCount);
   const cp = ds.crossPlatform;
   const hasCP = !!(cp && Array.isArray(cp.sources) && cp.sources.length);
-  const othersCount = hasCP ? cp.sources.reduce((s, x) => s + (x.items || []).length, 0) : 0;
+  const othersCount = (hasCP ? cp.sources.reduce((s, x) => s + (x.items || []).length, 0) : 0) + recs.length;
   let mainBody;
-  if (hasIdeas || hasInspo || hasCP) {
+  if (hasIdeas || hasInspo || hasCP || hasRecs || hasAnalytics) {
     const tabDefs = [{ k: "reels", label: "&#128241; Instagram Reels", n: mainReels.length }];
+    if (hasAnalytics) tabDefs.push({ k: "analytics", label: "&#128202; Analytics", n: an.onNicheCount });
     if (hasIdeas) tabDefs.push({ k: "ideas", label: "&#128161; Ideas", n: ideas.length });
     if (hasInspo) tabDefs.push({ k: "inspo", label: "&#10024; Inspiration", n: inspoReels.length });
-    if (hasCP) tabDefs.push({ k: "others", label: "&#127760; Others", n: othersCount });
+    if (hasCP || hasRecs) tabDefs.push({ k: "others", label: "&#127760; Others", n: othersCount });
     const tabBar = `<div class="tabs">${tabDefs.map((t, i) => `<button class="tab${i === 0 ? " on" : ""}" data-tab="${t.k}">${t.label} <span class="tcount">${t.n}</span></button>`).join("")}</div>`;
     const panel = (k, inner, on) => `<div class="tabpanel${on ? "" : " hidden"}" data-panel="${k}">${inner}</div>`;
-    let panels = panel("reels", `${cards}\n${quar}`, true);
+    let panels = panel("reels", `${cards}\n${quar}\n${offT}`, true);
+    if (hasAnalytics) panels += panel("analytics", analyticsSection(an), false);
     if (hasIdeas) panels += panel("ideas", ideasSection(ideas), false);
     if (hasInspo) panels += panel("inspo", `${inspoNote}\n${inspoCards}`, false);
-    if (hasCP) panels += panel("others", crossPlatformSection(ds), false);
+    if (hasCP || hasRecs) panels += panel("others", `${recommendationsBlock(recs)}\n${crossPlatformSection(ds)}`, false);
     mainBody = `${tabBar}${panels}`;
   } else {
-    mainBody = `${cards}\n${crossPlatformSection(ds)}\n${quar}`;
+    mainBody = `${cards}\n${recommendationsBlock(recs)}\n${crossPlatformSection(ds)}\n${quar}\n${offT}`;
   }
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Viral Radar — ${esc(ds.niche)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -262,6 +304,8 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
 .tab .tcount{font-family:var(--mono);font-size:11px;color:var(--faint);background:var(--card-2);border:1px solid var(--border);border-radius:7px;padding:1px 7px}.tab.on .tcount{color:var(--red);border-color:var(--red-bd)}
 .tabpanel.hidden{display:none}.trends{margin-top:8px;border-top:0;padding-top:0}
 .offnote{margin:2px 0 22px;padding:12px 16px;background:var(--card-2);border:1px solid var(--border);border-left:3px solid #9678FF;border-radius:10px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.atable{width:100%;border-collapse:collapse;font-size:13.5px}.atable th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);text-align:left;padding:6px 10px;border-bottom:1px solid var(--border)}.atable td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--muted)}.atable td:first-child{color:var(--text)}.atable tr:last-child td{border-bottom:0}
+.tsrc.recs{margin-bottom:22px;border-left:3px solid var(--green)}
 .ideas{display:grid;gap:16px}.idea{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px}.idea-h{display:flex;align-items:center;gap:12px;margin-bottom:12px}.idea-n{font-family:var(--mono);font-weight:700;color:var(--red);font-size:14px}.idea-hook{font-size:20px;font-weight:600;line-height:1.3;margin-bottom:10px}.idea-angle{color:var(--muted);font-size:14.5px;line-height:1.6}.idea-ground{margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:10px}
 @media print{.tabs{display:none}.tabpanel.hidden{display:block!important}.trends{margin-top:44px;border-top:1px solid var(--border);padding-top:30px}}
 @media(max-width:780px){.reel{grid-template-columns:1fr}.plays{grid-template-columns:1fr}}

@@ -205,3 +205,20 @@ test("formatViews renders B-tier counts", () => {
   assert.equal(formatViews(1.2e9), "1.2B");
   assert.equal(formatViews(2.34e10), "23B");
 });
+
+test("formatDigest surfaces creator recommendations without auto-adding, and drops off-topic reels", () => {
+  const ds = {
+    niche: "x", generatedAt: "2026-07-05",
+    reels: [
+      { shortcode: "A", url: "u", handle: "@a", hook: "on niche", rankScore: 90, postedAt: "2026-07-01", metrics: { views: 100000 } },
+      { shortcode: "B", url: "u", handle: "@b", hook: "gym day", rankScore: 99, postedAt: "2026-07-02", metrics: { views: 900000 }, offTopic: true },
+    ],
+    recommendations: [{ handle: "softgirlnocode", profile: "https://www.instagram.com/softgirlnocode/", bestViews: 2206772, relevantReels: 3 }],
+  };
+  const text = formatDigest(ds, { top: 5 });
+  assert.match(text, /Consider tracking/);
+  assert.match(text, /@softgirlnocode/);
+  assert.match(text, /3 niche reels/);
+  assert.doesNotMatch(text, /gym day/);       // off-topic reel out of the digest
+  assert.match(text, /on niche/);
+});
