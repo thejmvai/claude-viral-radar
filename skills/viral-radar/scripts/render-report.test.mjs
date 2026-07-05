@@ -108,3 +108,20 @@ test("badges an inspiration reel and leaves normal reels unbadged", () => {
   assert.match(html, /class="pill-inspo"/);
   assert.match(html, /INSPIRATION/);
 });
+
+test("a partial reel (failed enrichment) renders without killing the report", () => {
+  const partial = JSON.parse(JSON.stringify(ds));
+  partial.reels.push({
+    rank: 2, shortcode: "Partial1", url: "https://www.instagram.com/reel/Partial1/", handle: "@partial",
+    storyboard: [], transcript: "", hook: "", format: "", breakdown: "", whyItWorks: "",
+  });
+  const html = renderReport(partial, { framesBaseUrl: "" });
+  assert.match(html, /@partial/);      // the partial reel still shows
+  assert.match(html, /@democreator/);  // and the good reel is unaffected
+});
+
+test("transcript is embedded once (copy reads the body; no data-tx duplication)", () => {
+  const html = renderReport(ds, { framesBaseUrl: "" });
+  assert.doesNotMatch(html, /data-tx=/);
+  assert.match(html, /line one<br>line two/);
+});

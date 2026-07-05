@@ -15,11 +15,12 @@ export function decodeEntities(s) {
 }
 
 function toNum(s) {
-  const m = String(s).trim().match(/^([\d.,]+)\s*([KM]?)/);
+  const m = String(s).trim().match(/^([\d.,]+)\s*([KMB]?)/);
   if (!m) return 0;
   let n = parseFloat(m[1].replace(/,/g, ""));
   if (m[2] === "K") n *= 1e3;
   if (m[2] === "M") n *= 1e6;
+  if (m[2] === "B") n *= 1e9; // billion-view reels exist — without this they parsed as ~1 view
   return Math.round(n);
 }
 
@@ -29,7 +30,7 @@ export const parseCount = (s) => toNum(String(s ?? "").toUpperCase());
 // "<likes> likes, <comments> comments - <handle> on <Month D, YYYY>: \"<caption>\". "
 export function parseOgDescription(og) {
   const decoded = og || "";
-  const head = decoded.match(/^([\d.,KM]+)\s+likes,\s+([\d.,KM]+)\s+comments\s+-\s+([^\s]+)\s+on\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/);
+  const head = decoded.match(/^([\d.,KMB]+)\s+likes,\s+([\d.,KMB]+)\s+comments\s+-\s+([^\s]+)\s+on\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/);
   const out = { likes: 0, comments: 0, handle: null, postedAt: null, caption: "" };
   if (head) {
     out.likes = toNum(head[1]);

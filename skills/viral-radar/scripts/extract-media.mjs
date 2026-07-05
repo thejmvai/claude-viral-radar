@@ -14,12 +14,26 @@ export function hookFrameTimecodes(durationSec, secs = [0, 1, 2]) {
   return secs.filter((t) => t === 0 || t < durationSec);
 }
 
+// yt-dlp cookie args for authenticated Instagram downloads. IG now requires a logged-in session to
+// fetch reel media (anonymous requests get "rate-limit reached or login required"). Pass a browser to
+// read cookies from (e.g. "chrome", or "chrome:/path/to/profile") via opts.cookiesFromBrowser or the
+// VR_YTDLP_COOKIES_FROM_BROWSER env var, or a Netscape cookies.txt via opts.cookiesFile / VR_YTDLP_COOKIES_FILE.
+export function cookieArgs({ cookiesFromBrowser, cookiesFile } = {}) {
+  if (cookiesFile) return ["--cookies", cookiesFile];
+  if (cookiesFromBrowser) return ["--cookies-from-browser", cookiesFromBrowser];
+  return [];
+}
+
 // Download a reel and extract storyboard frames + 0/1/2s hook frames + audio.
 // Returns { videoPath, audioPath, frames: [paths], hookFrames: [paths], durationSec }.
-export function extractMedia(reelUrl, outDir, n = 4) {
+export function extractMedia(reelUrl, outDir, n = 4, opts = {}) {
   fs.mkdirSync(outDir, { recursive: true });
   const video = path.join(outDir, "reel.mp4");
-  execFileSync("yt-dlp", ["--no-warnings", "-o", video, reelUrl], { stdio: "inherit" });
+  const cookies = cookieArgs({
+    cookiesFromBrowser: opts.cookiesFromBrowser ?? process.env.VR_YTDLP_COOKIES_FROM_BROWSER,
+    cookiesFile: opts.cookiesFile ?? process.env.VR_YTDLP_COOKIES_FILE,
+  });
+  execFileSync("yt-dlp", ["--no-warnings", ...cookies, "-o", video, reelUrl], { stdio: "inherit" });
   const dur = parseFloat(
     execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video]).toString().trim()
   );

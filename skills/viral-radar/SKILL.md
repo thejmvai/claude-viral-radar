@@ -13,19 +13,24 @@ All outputs are written under `viral-radar-out/` in the **user's current working
 
 1. **First-run check:** check whether `viral-radar-out/.onboarded` exists in the user's current working directory. If it does **not** exist, run the steps below before anything else. If it **does** exist, skip this section entirely and continue to Step 1.
 
-2. **Browser/MCP check:** this skill drives an automation browser via the **chrome-devtools MCP**. Verify it is available by checking whether you have tools named `mcp__chrome-devtools__*` (e.g. attempt `mcp__chrome-devtools__list_pages`). If the tools are **not** available, tell the user verbatim:
+2. **Browser/MCP check (non-blocking):** the MCP is only ONE of three ways to scrape — the skill also runs
+   MCP-free (Step 2 no-MCP via a debug Chrome, or the paid Step 2 API path). Check whether tools named
+   `mcp__chrome-devtools__*` exist (e.g. attempt `mcp__chrome-devtools__list_pages`). If they are **not**
+   available, do **NOT** stop — tell the user:
 
-   > "The automation browser needs the chrome-devtools MCP, which isn't installed yet. Add it once by running this in your terminal:
-   > `claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest`
-   > then fully restart Claude Code and run /viral-radar again."
+   > "The chrome-devtools MCP isn't installed — that's fine. This skill can scrape without it (a debug
+   > Chrome via `scripts/scrape-cdp.mjs`, or the paid ScrapeCreators path). If you'd like the MCP anyway,
+   > add it once with `claude mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest` and restart
+   > Claude Code."
 
-   Then **STOP** (do not continue any further).
+   Then continue to the next onboarding step.
 
-3. **Instagram login:** use `mcp__chrome-devtools__navigate_page` to open `https://www.instagram.com/` in the automation browser. Use `mcp__chrome-devtools__take_screenshot` to check whether a login wall is visible (i.e. the user is not logged in). If Instagram is showing a login screen or gate, tell the user:
+3. **Instagram login (only if the MCP is available):** use `mcp__chrome-devtools__navigate_page` to open `https://www.instagram.com/` in the automation browser. Use `mcp__chrome-devtools__take_screenshot` to check whether a login wall is visible (i.e. the user is not logged in). If Instagram is showing a login screen or gate, tell the user:
 
    > "Instagram needs a one-time login. A browser window should be open — please log in to Instagram with your own account there. Your login is only used locally to read pages; it is never stored by this skill. Let me know when you're logged in."
 
-   Wait for the user to confirm they are logged in before continuing.
+   Wait for the user to confirm they are logged in before continuing. **If the MCP is not available, skip
+   this step** — on the no-MCP path the login happens in the debug Chrome instead (see `workflows/scrape-cdp.md`).
 
 4. **Ask the niche:** ask the user: "What niche are you in? (e.g. AI tools, fitness, personal finance, cooking)" Once they answer, do the following:
    - Create `viral-radar-out/` if it does not exist.
@@ -173,7 +178,7 @@ Enrich reels in that combined order (floor reels first).
 
 For each reel:
 
-1. **Download media:** run `node scripts/extract-media.mjs <reelUrl> viral-radar-out/frames/<shortcode>`. This writes `1.jpg`–`4.jpg` (storyboard frames), `hook-0.jpg`/`hook-1.jpg`/`hook-2.jpg` (the literal first 0/1/2 seconds, for sharper hook study), and `audio.m4a`. Record the hook frames on the reel as `hookFrames: ["frames/<shortcode>/hook-0.jpg", ...]` (relative to `viral-radar-out/`) — the report shows them as a filmstrip in the Hook section.
+1. **Download media:** run `node scripts/extract-media.mjs <reelUrl> viral-radar-out/frames/<shortcode>`. This writes `1.jpg`–`4.jpg` (storyboard frames), `hook-0.jpg`/`hook-1.jpg`/`hook-2.jpg` (the literal first 0/1/2 seconds, for sharper hook study), and `audio.m4a`. Record the hook frames on the reel as `hookFrames: ["frames/<shortcode>/hook-0.jpg", ...]` (relative to `viral-radar-out/`) — the report shows them as a filmstrip in the Hook section. Also record the returned `durationSec` (rounded) as `metrics.durationSec` — the validator requires it on every reel. **Instagram gates media downloads behind login:** if yt-dlp fails with "rate-limit reached or login required", set `VR_YTDLP_COOKIES_FROM_BROWSER=chrome` in the environment (any browser profile that is logged into Instagram; `VR_YTDLP_COOKIES_FILE` takes a Netscape cookies.txt instead). The scheduled refresh sets this automatically.
 2. **Transcribe audio:** if `whisper` is available on PATH, run `whisper viral-radar-out/frames/<shortcode>/audio.m4a --model base.en --output_format txt`. Read the `.txt` output. Alternatively, if a `GROQ_API_KEY` or `OPENAI_API_KEY` environment variable is set, use the respective Whisper API endpoint.
 3. **Analyze frames with Claude vision:** read the 4 `.jpg` frames and ask Claude to produce:
    - `storyboard`: array of `{ timestamp, role, caption }` for each frame (role = Hook / Proof / CTA / etc., caption = what's happening on screen + any on-screen text)
@@ -209,7 +214,7 @@ Regenerate `nicheSynthesis` from the gate-passing reels — but **exclude any re
 
 ## Step 6 — Write outputs
 
-1. Build the full `ViralDataset` object: `{ niche, generatedAt, nicheSynthesis, reels, quarantined }`.
+1. Build the full `ViralDataset` object: `{ niche, label, generatedAt, nicheSynthesis, reels, quarantined }` (copy `label` from the config — the report header and Telegram digest use it; quarantined reels carry no `rank`, that's expected).
    - **Optional cross-platform trends:** to add a "Hot across the niche" section below the reels, run `/last30days <niche>` (free sources suffice) and attach the top items as `crossPlatform: { window, summary, themes: [...], sources: [{ platform, icon, items: [{ title, url, metric }] }] }`. `render-report.mjs` renders it automatically when present — competitor reels above, niche-wide chatter (Reddit, TikTok, YouTube, GitHub) below.
 2. **Validate first:** run `node scripts/validate.mjs viral-radar-out/<niche>.config.json` and the dataset object (pipe JSON or write a temp file). If validation errors are returned, print them and **abort the write**.
 3. Write `viral-radar-out/<niche>.json` (overwrite).
@@ -282,7 +287,7 @@ Turn the radar into reel ideas. Workflow SOP: `workflows/ideator.md`. **GATE: id
 
 - **Claude Code** (this skill is invoked via `/viral-radar`)
 - **chrome-devtools MCP** — for Instagram scraping (Step 2). Or skip it: use **Step 2 (no MCP)** with `scripts/scrape-cdp.mjs` + a Chrome launched on `--remote-debugging-port=9222` (dependency-free, no MCP).
-- **yt-dlp** + **ffmpeg** on PATH — for media extraction
+- **yt-dlp** + **ffmpeg** on PATH — for media extraction. Instagram now requires an authenticated session to download reel media: have a browser profile logged into Instagram and set `VR_YTDLP_COOKIES_FROM_BROWSER=chrome` (or `VR_YTDLP_COOKIES_FILE=<cookies.txt>`) when running enrichment by hand — `refresh.mjs` sets it automatically.
 - **Whisper** (optional) — `pip install openai-whisper` — or set `GROQ_API_KEY` / `OPENAI_API_KEY` for cloud transcription
 - **ScrapeCreators API key** (optional) — powers Step 2.5 discovery **and the paid Step 2 reel scrape** (`scripts/scrape-api.mjs`); free tier at https://app.scrapecreators.com, set `SCRAPECREATORS_API_KEY`. Paid calls are spend-gated.
 - **nexlev MCP** (optional) — fallback enrichment when local media extraction fails

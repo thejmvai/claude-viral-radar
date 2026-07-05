@@ -185,3 +185,9 @@ test("resolveScrapeList tolerates a config with no inspiration lane", () => {
   assert.deepEqual(resolveScrapeList({ trackedHandles: ["a"] }), [{ handle: "a", trackingCategory: null }]);
   assert.deepEqual(resolveScrapeList({}), []);
 });
+
+test("CdpClient.send times out instead of hanging on a dead target", async () => {
+  class DeadWS { addEventListener() {} send() {} close() {} }
+  const cdp = new CdpClient(new DeadWS());
+  await assert.rejects(() => cdp.send("Page.enable", {}, { timeoutMs: 30 }), /timed out/);
+});

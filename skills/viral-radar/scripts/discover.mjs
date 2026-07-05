@@ -23,7 +23,7 @@ function parseEnvFile(p) {
   try {
     for (const line of fs.readFileSync(p, "utf8").split("\n")) {
       const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.+?)\s*$/);
-      if (m && !line.trimStart().startsWith("#")) out[m[1]] = m[2];
+      if (m && !line.trimStart().startsWith("#")) out[m[1]] = m[2].replace(/^["']|["']$/g, "");
     }
   } catch {}
   return out;
@@ -110,16 +110,21 @@ export function aggregateCreators(reels, { exclude = [], minViews = 50000, now =
   return creators;
 }
 
-// --- network ----------------------------------------------------------------
-async function searchHashtag(tag, key, { attempts = 3 } = {}) {
+// --- network (retry/error logic unit-tested via fetchImpl) -------------------
+// The hashtag endpoint is flaky (429/500 under bursts — see CLAUDE.md gotchas): back off between
+// attempts, and keep the LAST error so a failed tag prints as itself instead of a silent "0 reels".
+export async function searchHashtag(tag, key, { attempts = 3, fetchImpl = fetch, waitMs = 1000 } = {}) {
+  let error = null;
   for (let i = 0; i < attempts; i++) {
+    if (i) await new Promise((r) => setTimeout(r, waitMs * i));
     try {
-      const res = await fetch(`${SC_BASE}?query=${encodeURIComponent(tag)}`, { headers: { "x-api-key": key } });
+      const res = await fetchImpl(`${SC_BASE}?query=${encodeURIComponent(tag)}`, { headers: { "x-api-key": key } });
       const data = await res.json();
-      if (data && data.success) return { reels: data.reels || [], credits: data.credits_remaining };
-    } catch {}
+      if (data && data.success) return { reels: data.reels || [], credits: data.credits_remaining, error: null };
+      error = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+    } catch (e) { error = String(e.message || e); }
   }
-  return { reels: [], credits: null };
+  return { reels: [], credits: null, error };
 }
 
 // --- CLI --------------------------------------------------------------------
@@ -172,11 +177,13 @@ async function main() {
   console.log(`Discovery for niche "${niche}": searching #${hashtags.join(", #")} (excluding ${exclude.size} known handles)`);
   const all = [];
   let credits = null;
-  for (const tag of hashtags) {
-    const { reels, credits: c } = await searchHashtag(tag, key);
+  for (let i = 0; i < hashtags.length; i++) {
+    const tag = hashtags[i];
+    if (i) await new Promise((r) => setTimeout(r, 1200)); // space tags out — the endpoint 429s under bursts
+    const { reels, credits: c, error } = await searchHashtag(tag, key);
     if (c != null) credits = c;
     const parsed = reels.map(parseReel).filter(Boolean);
-    console.log(`  #${tag}: ${parsed.length} reels`);
+    console.log(`  #${tag}: ${parsed.length} reels${error ? ` (⚠ ${error})` : ""}`);
     all.push(...parsed);
   }
 

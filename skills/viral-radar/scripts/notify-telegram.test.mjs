@@ -183,3 +183,25 @@ test("sendTelegramMessage throws with the API description on failure", async () 
     /chat not found/
   );
 });
+
+test("truncateForTelegram cuts at a line boundary, never mid-tag", async () => {
+  const { truncateForTelegram } = await import("./notify-telegram.mjs");
+  const line = `1. <a href="https://example.com/x">a hook</a>`;
+  const text = Array.from({ length: 200 }, () => line).join("\n");
+  const out = truncateForTelegram(text, 4096);
+  assert.ok(out.length <= 4096);
+  assert.equal((out.match(/<a /g) || []).length, (out.match(/<\/a>/g) || []).length);
+  assert.ok(out.endsWith("…"));
+  // single giant line: the dangling tag is stripped instead
+  const one = "x".repeat(4080) + '<a href="https://e.com/long-url">t</a>';
+  const cut = truncateForTelegram(one, 4096);
+  assert.ok(cut.length <= 4096);
+  assert.doesNotMatch(cut, /<a [^>]*$/);
+  // under the limit passes through untouched
+  assert.equal(truncateForTelegram("short", 4096), "short");
+});
+
+test("formatViews renders B-tier counts", () => {
+  assert.equal(formatViews(1.2e9), "1.2B");
+  assert.equal(formatViews(2.34e10), "23B");
+});

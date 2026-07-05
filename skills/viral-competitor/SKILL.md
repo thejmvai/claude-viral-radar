@@ -54,22 +54,23 @@ Wait for the user's reply and then parse handles from it before continuing.
 
 Run the full scrape and report workflow for the **newly added handles only** (not the entire `trackedHandles` list — this keeps the run fast). Follow the viral-radar detection + enrichment + ranking + synthesis + write-outputs steps exactly:
 
-- The shared scripts live at `../viral-radar/scripts/` relative to this SKILL.md once both skills are installed under `~/.claude/skills/` — for example:
-  - `node ../viral-radar/scripts/score.mjs`
-  - `node ../viral-radar/scripts/validate.mjs`
-  - `node ../viral-radar/scripts/render-report.mjs`
-  - `node ../viral-radar/scripts/parse-og.mjs`
-  - `node ../viral-radar/scripts/extract-media.mjs`
+- **Ask which data source to use (same choice as viral-radar Step 1.5):** *paid* (`scrape-api.mjs`, ScrapeCreators — fast, exact metrics, costs credits, spend-gated) or *free* (`scrape-cdp.mjs`, chrome — slower, IG can throttle). Both accept `--handles=<the new handles>` and write the same work-list shape.
+- The shared scripts live in the viral-radar skill install. **Run all commands from the project root** (the directory containing `viral-radar-out/` — outputs are written relative to the CWD), referencing the scripts by their installed path, e.g.:
+  - `node ~/.claude/skills/viral-radar/scripts/scrape-api.mjs --niche=<niche> --handles=<h1,h2>` (paid) or `node ~/.claude/skills/viral-radar/scripts/scrape-cdp.mjs --niche=<niche> --handles=<h1,h2>` (free)
+  - `node ~/.claude/skills/viral-radar/scripts/extract-media.mjs <reelUrl> viral-radar-out/frames/<shortcode>`
+  - `node ~/.claude/skills/viral-radar/scripts/validate.mjs <config> <dataset>`
+  - `node ~/.claude/skills/viral-radar/scripts/render-report.mjs <dataset> <out.html>`
+  (In this project the local install lives at `.claude/skills/viral-radar/scripts/` — same layout.)
 - Use the config loaded in Step 3 for thresholds (`viralThreshold`, `velocityThreshold`, etc.).
-- The scraper (`scrape-cdp.mjs`) reads both lanes from the config and stamps `trackingCategory: "inspiration"` on reels from an inspiration handle. Passing `--handles=<the new handle>` still tags it correctly (the tag comes from config membership, not the flag).
+- Both scrapers read both lanes from the config and stamp `trackingCategory: "inspiration"` on reels from an inspiration handle. Passing `--handles=<the new handle>` still tags it correctly (the tag comes from config membership, not the flag).
 - Append newly discovered reels to the existing dataset at `viral-radar-out/<niche>.json` (merge, do not overwrite the full dataset unless re-generating from scratch).
 - Update `viral-radar-out/cache/<niche>-seen.json` with newly processed shortcodes.
 - Re-run synthesis over the merged dataset's gate-passing reels, **excluding** any with `trackingCategory === "inspiration"` (out-of-niche style references must not skew the niche synthesis — see `../viral-radar/workflows/inspiration-lane.md`).
-- Validate with `../viral-radar/scripts/validate.mjs` before writing.
-- Render the report into the date-stamped archive folder, then update the latest pointer:
+- Validate with `validate.mjs` before writing.
+- Render the report into the date-stamped archive folder, then update the latest pointer (from the project root):
   ```
   mkdir -p viral-radar-out/reports/<YYYY-MM-DD>
-  node ../viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html
+  node ~/.claude/skills/viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html
   cp viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/<niche>.json
   ```
   Then copy the rendered report to `viral-radar-out/report-latest.html`.

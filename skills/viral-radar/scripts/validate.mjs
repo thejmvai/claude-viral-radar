@@ -14,9 +14,12 @@ export function validateConfig(cfg) {
   return errs;
 }
 
-function validateReel(r, where) {
+function validateReel(r, where, { requireRank = true } = {}) {
   const errs = [];
-  for (const f of REEL_FIELDS) if (r[f] === undefined) errs.push(`${where} missing ${f}`);
+  for (const f of REEL_FIELDS) {
+    if (f === "rank" && !requireRank) continue;
+    if (r[f] === undefined) errs.push(`${where} missing ${f}`);
+  }
   if (r.metrics) for (const f of METRIC_FIELDS) if (r.metrics[f] === undefined) errs.push(`${where}.metrics missing ${f}`);
   if (!Array.isArray(r.storyboard)) errs.push(`${where}.storyboard not an array`);
   // trackingCategory is optional; if present it must be a known value.
@@ -31,7 +34,8 @@ export function validateDataset(ds) {
   for (const f of ["niche","generatedAt","nicheSynthesis","reels","quarantined"])
     if (ds[f] === undefined) errs.push(`dataset missing ${f}`);
   (ds.reels || []).forEach((r, i) => errs.push(...validateReel(r, `reels[${i}]`)));
-  (ds.quarantined || []).forEach((r, i) => errs.push(...validateReel(r, `quarantined[${i}]`)));
+  // Quarantined reels are excluded from ranking (rankReels never touches them), so rank is optional there.
+  (ds.quarantined || []).forEach((r, i) => errs.push(...validateReel(r, `quarantined[${i}]`, { requireRank: false })));
   return errs;
 }
 

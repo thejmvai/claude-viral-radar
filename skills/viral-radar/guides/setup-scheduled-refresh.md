@@ -49,3 +49,9 @@ launchctl unload ~/Library/LaunchAgents/com.jamesonc.viral-radar-refresh.plist
   nothing that run and recover next time (see `scrape-cdp.md`).
 - **`--dangerously-skip-permissions`** is used so the unattended run can execute the skill's own scripts
   without prompts. It runs only your vetted skill on your machine; review `refresh.mjs` if unsure.
+
+## Media downloads need an Instagram-authenticated browser
+Instagram gates reel media behind login. The refresh passes yt-dlp your main Chrome profile's cookies
+by default (`VR_YTDLP_COOKIES_FROM_BROWSER=chrome`). Make sure that Chrome is logged into Instagram, or
+point the refresh elsewhere with `--ytdlp-cookies=<browser[:profile-dir]>` (yt-dlp
+`--cookies-from-browser` syntax) or a `VR_YTDLP_COOKIES_FILE=<cookies.txt>`.

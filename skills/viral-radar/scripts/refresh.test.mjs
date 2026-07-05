@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chromeLaunchArgv, scrapeArgv, claudeEnrichPrompt, claudeArgv, chromeReachable } from "./refresh.mjs";
+import { chromeLaunchArgv, scrapeArgv, claudeEnrichPrompt, claudeArgv, chromeReachable, childEnv } from "./refresh.mjs";
 
 test("chromeLaunchArgv has the debug port, allowed origins, profile, and start url", () => {
   const argv = chromeLaunchArgv("/tmp/prof", 9222);
@@ -44,4 +44,12 @@ test("chromeReachable is true on a 200 and false when fetch throws", async () =>
   const down = await chromeReachable(9222, async () => { throw new Error("ECONNREFUSED"); });
   assert.equal(ok, true);
   assert.equal(down, false);
+});
+
+test("childEnv wires the yt-dlp cookie source through, respecting explicit overrides", () => {
+  assert.equal(childEnv({}).VR_YTDLP_COOKIES_FROM_BROWSER, "chrome");                       // default
+  assert.equal(childEnv({}, "chrome:/tmp/prof").VR_YTDLP_COOKIES_FROM_BROWSER, "chrome:/tmp/prof");
+  assert.equal(childEnv({ VR_YTDLP_COOKIES_FROM_BROWSER: "firefox" }).VR_YTDLP_COOKIES_FROM_BROWSER, "firefox"); // env wins
+  assert.equal(childEnv({ VR_YTDLP_COOKIES_FILE: "/c.txt" }).VR_YTDLP_COOKIES_FROM_BROWSER, undefined); // file mode wins
+  assert.equal(childEnv({}, "").VR_YTDLP_COOKIES_FROM_BROWSER, undefined);                  // explicit off
 });
