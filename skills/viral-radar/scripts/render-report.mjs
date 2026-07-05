@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n).toLocaleString("en-US");
@@ -274,10 +275,24 @@ details.tx{margin-top:22px;border:1px solid var(--border);border-radius:12px;bac
   .reel{break-inside:avoid;page-break-inside:avoid}
 }`;
 
-// CLI: node render-report.mjs <dataset.json> <out.html>
+// CLI: node render-report.mjs <dataset.json> <out.html> [--frames-base=<prefix>]
+// --frames-base: prefix for the frames/... img paths. Reports at viral-radar-out/ root need "" (the
+// default); DATE-ARCHIVED reports live two levels deeper, so they need --frames-base=../../frames/
+// (with the dataset's "frames/..." paths, pass the prefix ending at the parent of frames/: "../../").
+// Every render is followed by an automatic asset check (check-report.mjs) — a report with broken
+// image refs fails loudly (exit 2) instead of shipping dead photos.
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-  const [dsPath, outPath] = process.argv.slice(2);
+  const pos = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+  const fbFlag = process.argv.find((a) => a.startsWith("--frames-base="));
+  // Dataset frame paths already start with "frames/", so the base is everything BEFORE that.
+  const framesBaseUrl = fbFlag ? fbFlag.split("=").slice(1).join("=").replace(/frames\/?$/, "") : "";
+  const [dsPath, outPath] = pos;
+  if (!dsPath || !outPath) { console.error("usage: node render-report.mjs <dataset.json> <out.html> [--frames-base=../../]"); process.exit(1); }
   const ds = JSON.parse(fs.readFileSync(dsPath, "utf8"));
-  fs.writeFileSync(outPath, renderReport(ds, { framesBaseUrl: "" }));
+  fs.writeFileSync(outPath, renderReport(ds, { framesBaseUrl }));
   console.log(`wrote ${outPath}`);
+  const { verifyReportAssets, formatCheck } = await import("./check-report.mjs");
+  const res = verifyReportAssets(fs.readFileSync(outPath, "utf8"), path.dirname(path.resolve(outPath)));
+  console.log(formatCheck(res, outPath));
+  if (res.missing.length) process.exit(2);
 }

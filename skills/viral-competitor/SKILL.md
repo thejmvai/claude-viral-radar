@@ -67,13 +67,14 @@ Run the full scrape and report workflow for the **newly added handles only** (no
 - Update `viral-radar-out/cache/<niche>-seen.json` with newly processed shortcodes.
 - Re-run synthesis over the merged dataset's gate-passing reels, **excluding** any with `trackingCategory === "inspiration"` (out-of-niche style references must not skew the niche synthesis — see `../viral-radar/workflows/inspiration-lane.md`).
 - Validate with `validate.mjs` before writing.
-- Render the report into the date-stamped archive folder, then update the latest pointer (from the project root):
+- Render the report into the date-stamped archive folder AND the latest pointer — **two separate renders** (the archive needs `--frames-base=../../frames/` because it lives two levels below `frames/`; `report-latest.html` needs none — copying one render to the other location breaks every photo). From the project root:
   ```
   mkdir -p viral-radar-out/reports/<YYYY-MM-DD>
-  node ~/.claude/skills/viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html
+  node ~/.claude/skills/viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html --frames-base=../../frames/
+  node ~/.claude/skills/viral-radar/scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/report-latest.html
   cp viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/<niche>.json
   ```
-  Then copy the rendered report to `viral-radar-out/report-latest.html`.
+  `render-report.mjs` auto-checks every image/link ref after writing and exits 2 if any are broken — a failing render is a STOP: fix and re-render, never ship a report with dead photos.
 
 ---
 
