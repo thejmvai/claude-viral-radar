@@ -219,13 +219,15 @@ Regenerate `nicheSynthesis` from the gate-passing reels — but **exclude any re
 2. **Validate first:** run `node scripts/validate.mjs viral-radar-out/<niche>.config.json` and the dataset object (pipe JSON or write a temp file). If validation errors are returned, print them and **abort the write**.
 3. Write `viral-radar-out/<niche>.json` (overwrite).
 4. Update the seen-cache at `viral-radar-out/cache/<niche>-seen.json`: add each processed shortcode with `{ firstSeen: <ISO timestamp>, enriched: true }`.
-5. Render the HTML report into a **date-stamped archive folder** so every run is cataloged by date and old runs stay around to compare against:
+5. Render the HTML report into a **date-stamped archive folder** so every run is cataloged by date and old runs stay around to compare against. **Render each destination separately — do NOT `cp` one render to the other**: the archive lives two levels below `frames/`, so its image paths need the `--frames-base` prefix while `report-latest.html` needs none (copying one to the other location breaks every photo):
    ```
    mkdir -p viral-radar-out/reports/<YYYY-MM-DD>
-   node scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html
+   node scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/report.html --frames-base=../../frames/
+   node scripts/render-report.mjs viral-radar-out/<niche>.json viral-radar-out/report-latest.html
    cp viral-radar-out/<niche>.json viral-radar-out/reports/<YYYY-MM-DD>/<niche>.json
    ```
-   Then copy the rendered report to `viral-radar-out/report-latest.html` (the always-newest pointer at the top level). If multiple runs happen on the same day, append a `-HHMM` suffix to the folder so earlier runs are not overwritten.
+   If multiple runs happen on the same day, append a `-HHMM` suffix to the folder so earlier runs are not overwritten.
+   **Routine check (every render, non-negotiable):** `render-report.mjs` automatically verifies every image/link ref after writing (via `check-report.mjs`) and exits 2 listing the broken refs if any asset does not resolve. A failing render is a STOP — fix the cause (usually a wrong `--frames-base`) and re-render; never hand the user a report that failed the check. To audit any existing report: `node scripts/check-report.mjs <report.html>`.
 6. Tell the user: "Open `viral-radar-out/report-latest.html` for the latest, or browse `viral-radar-out/reports/<date>/` for past runs. Print to PDF from Chrome for a shareable dossier."
 
 ---
