@@ -46,6 +46,11 @@ said "Markdown"; HTML is the correctness-driven swap. Messages are truncated saf
 - **Missing credentials:** print digest, exit 0 (the step is optional). Tell the user how to set them.
 - **Telegram API error with creds present:** surface the `description` field from the API response and
   exit non-zero so the run summary shows the failure.
+- **`fetch failed` / ETIMEDOUT while `curl https://api.telegram.org` works (live 2026-07-05):**
+  api.telegram.org publishes AAAA records; on a machine with a broken IPv6 route Node resolves IPv6
+  first and times out where curl falls back to IPv4. Fixed in the tool — it calls
+  `dns.setDefaultResultOrder("ipv4first")` at startup. If a similar error ever hits another script's
+  `fetch`, the same one-liner (or running Node with `--dns-result-order=ipv4first`) is the fix.
 
 ## Wire-in
 SKILL.md Step 7 (Summary output): after printing the console SUMMARY, if credentials resolve, run the
