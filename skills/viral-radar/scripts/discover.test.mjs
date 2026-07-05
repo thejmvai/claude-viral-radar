@@ -87,3 +87,25 @@ test("searchHashtag retries with backoff and surfaces the API error instead of a
   assert.equal(ok.reels.length, 1);
   assert.equal(ok.error, null);
 });
+
+test("aggregateCreators qualifies by caption relevance when keywords are set (off-niche giant demoted)", () => {
+  const now = new Date("2026-07-05");
+  const KW = ["claude", "ai agent", "automation"];
+  const reels = [
+    // giant: 3 search hits but only 1 caption is actually about the niche
+    { id: "g1", handle: "biggiant", views: 4000000, caption: "my dog made this video lol", date: "2026-07-01" },
+    { id: "g2", handle: "biggiant", views: 3000000, caption: "prank on my sister", date: "2026-07-02" },
+    { id: "g3", handle: "biggiant", views: 2000000, caption: "Claude made this edit", date: "2026-07-03" },
+    // real niche creator: 2 relevant captions
+    { id: "r1", handle: "realbuilder", views: 200000, caption: "how I run my automation stack", date: "2026-07-02" },
+    { id: "r2", handle: "realbuilder", views: 150000, caption: "my ai agent books my calls", date: "2026-07-03" },
+  ];
+  const out = aggregateCreators(reels, { minViews: 50000, now, minNicheReels: 2, keywords: KW });
+  const giant = out.find((c) => c.handle === "biggiant");
+  const real = out.find((c) => c.handle === "realbuilder");
+  assert.equal(giant.relevantReels, 1);
+  assert.equal(giant.singleMatch, true);        // 3 search hits, but only 1 RELEVANT -> not qualified
+  assert.equal(real.relevantReels, 2);
+  assert.equal(real.singleMatch, false);
+  assert.equal(out[0].handle, "realbuilder");   // qualified ranks above the bigger reach
+});

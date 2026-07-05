@@ -138,6 +138,7 @@ export function buildWorklistItem({ shortcode, views, og = {}, handle, followers
     shortcode,
     url: `https://www.instagram.com/reel/${shortcode}/`,
     handle: handle.startsWith("@") ? handle : `@${handle}`,
+    caption: String(og.caption || "").slice(0, 2000), // carried through for reel-level niche relevance
     creatorName: "",
     followers: followers ?? null,
     discoveredVia: "tracked",

@@ -192,6 +192,19 @@ For each reel:
 5. **Fallback:** if `extract-media.mjs` fails (yt-dlp/ffmpeg not available or download error) OR transcription fails: call the nexlev MCP `watch_instagram_video_and_ask` with the reel URL and ask the same questions (storyboard captions, format, hook, hookDelivery, ctaType, breakdown, whyItWorks). Set `enrichmentEngine: "nexlev"`. If `watch_instagram_video_and_ask` also fails, store a partial record (fill unknown fields with `""`) and continue to the next reel.
 6. Build the complete `ViralReel` object. Set `storyboard[n].frame` to `frames/<shortcode>/<n+1>.jpg` and `hookFrames` to the `frames/<shortcode>/hook-*.jpg` paths (both relative to `viral-radar-out/`).
 
+### Step 3.75 — Niche relevance filter (kills the off-topic mess)
+
+A tracked creator's viral reel is not automatically niche signal (their gym reel going viral teaches the
+AI radar nothing). After enrichment, tag every new reel with `tagRelevance` from `scripts/relevance.mjs`
+(config `nicheKeywords` + `nicheMinKeywordHits`, word-boundary matching over caption + hook + transcript):
+
+- `offTopic: false` → continues to Step 4 ranking as normal (keeps its `nicheRelevance` evidence).
+- `offTopic: true` → goes to the dataset's **`offTopic` array** (NOT `reels`): kept and rendered in its own
+  report section, but out of the ranking, synthesis, digest, Ideator, and analytics.
+- Inspiration-lane reels are never flagged (they are off-niche on purpose).
+
+Workflow SOP: `workflows/relevance-filter.md`.
+
 ---
 
 ## Step 4 — Quality gate + ranking
@@ -212,9 +225,25 @@ Regenerate `nicheSynthesis` from the gate-passing reels — but **exclude any re
 
 ---
 
+## Step 5.5 — Analytics (the numbers layer)
+
+Compute the deterministic performance benchmarks and attach them as `ds.analytics`:
+
+```
+node scripts/analytics.mjs viral-radar-out/<niche>.json
+```
+
+`buildAnalytics` groups the on-niche library (inspiration + off-topic excluded) into a format
+leaderboard (count / median views / avg signal / gate share), gate-vs-organic lift, duration sweet
+spots, per-creator scorecards, and hook stats. Attach the printed JSON as `ds.analytics` — the report
+renders it as the **📊 Analytics** tab and the /#insights page consumes the same block. Narrate insights
+from these numbers; never hand-count. Workflow SOP: `workflows/analytics.md`.
+
+---
+
 ## Step 6 — Write outputs
 
-1. Build the full `ViralDataset` object: `{ niche, label, generatedAt, nicheSynthesis, reels, quarantined }` (copy `label` from the config — the report header and Telegram digest use it; quarantined reels carry no `rank`, that's expected).
+1. Build the full `ViralDataset` object: `{ niche, label, generatedAt, nicheSynthesis, reels, quarantined, offTopic, analytics, recommendations }` (copy `label` from the config — the report header and Telegram digest use it; quarantined/offTopic reels carry no `rank`, that's expected). `recommendations` = the top ≤5 **qualified** creators from the latest `discovery-<niche>.json` (never `singleMatch` ones), each `{ handle, profile, bestViews, relevantReels, reason }` — these are SURFACED in the report + digest for Jameson to decide on; the skill never adds a creator itself.
    - **Optional cross-platform trends:** to add a "Hot across the niche" section below the reels, run `/last30days <niche>` (free sources suffice) and attach the top items as `crossPlatform: { window, summary, themes: [...], sources: [{ platform, icon, items: [{ title, url, metric }] }] }`. `render-report.mjs` renders it automatically when present — competitor reels above, niche-wide chatter (Reddit, TikTok, YouTube, GitHub) below.
 2. **Validate first:** run `node scripts/validate.mjs viral-radar-out/<niche>.config.json` and the dataset object (pipe JSON or write a temp file). If validation errors are returned, print them and **abort the write**.
 3. Write `viral-radar-out/<niche>.json` (overwrite).
@@ -228,7 +257,14 @@ Regenerate `nicheSynthesis` from the gate-passing reels — but **exclude any re
    ```
    If multiple runs happen on the same day, append a `-HHMM` suffix to the folder so earlier runs are not overwritten.
    **Routine check (every render, non-negotiable):** `render-report.mjs` automatically verifies every image/link ref after writing (via `check-report.mjs`) and exits 2 listing the broken refs if any asset does not resolve. A failing render is a STOP — fix the cause (usually a wrong `--frames-base`) and re-render; never hand the user a report that failed the check. To audit any existing report: `node scripts/check-report.mjs <report.html>`.
-6. Tell the user: "Open `viral-radar-out/report-latest.html` for the latest, or browse `viral-radar-out/reports/<date>/` for past runs. Print to PDF from Chrome for a shareable dossier."
+6. **Retention cleanup (every run — old files must not pile up):**
+   ```
+   node scripts/cleanup.mjs --niche=<niche>
+   ```
+   Keeps the newest `config.keepArchives` (default 5) report archives, deletes frame folders no longer
+   referenced by the live dataset or any kept archive, and prunes stale `worklist-*.json` (>7d) and
+   `.bak-*` folders (>30d). Use `--dry-run` to preview. Workflow SOP: `workflows/cleanup.md`.
+7. Tell the user: "Open `viral-radar-out/report-latest.html` for the latest, or browse `viral-radar-out/reports/<date>/` for past runs. Print to PDF from Chrome for a shareable dossier."
 
 ---
 
@@ -275,6 +311,7 @@ Turn the radar into reel ideas. Workflow SOP: `workflows/ideator.md`. **GATE: id
 4. **Show in the report (optional):** attach `ds.ideas = ideas` and re-render — `render-report.mjs` shows
    an **"💡 Ideas" tab**.
 5. **Review gate:** present the ideas to Jameson as a draft. Do not post/schedule/publish until he approves.
+6. **Remix mode (rescript a specific winner):** `node scripts/ideator.mjs viral-radar-out/<niche>.json --remix=<shortcode>` prints that reel's beat structure, hook mechanics, and why-it-worked as a context pack. Write the remix from it — same skeleton, his topic, his voice — as a DRAFT for review.
 
 ## Scope notes
 

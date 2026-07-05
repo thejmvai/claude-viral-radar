@@ -34,8 +34,10 @@ export function validateDataset(ds) {
   for (const f of ["niche","generatedAt","nicheSynthesis","reels","quarantined"])
     if (ds[f] === undefined) errs.push(`dataset missing ${f}`);
   (ds.reels || []).forEach((r, i) => errs.push(...validateReel(r, `reels[${i}]`)));
-  // Quarantined reels are excluded from ranking (rankReels never touches them), so rank is optional there.
+  // Quarantined and off-topic reels are excluded from ranking (rankReels never touches them),
+  // so rank is optional there. offTopic itself is an optional dataset field (relevance filter).
   (ds.quarantined || []).forEach((r, i) => errs.push(...validateReel(r, `quarantined[${i}]`, { requireRank: false })));
+  (ds.offTopic || []).forEach((r, i) => errs.push(...validateReel(r, `offTopic[${i}]`, { requireRank: false })));
   return errs;
 }
 

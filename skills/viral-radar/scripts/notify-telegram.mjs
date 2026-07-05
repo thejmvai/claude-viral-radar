@@ -92,11 +92,11 @@ export function topTrends(crossPlatform, n = 3) {
 }
 
 // Build the full HTML digest string from a ViralDataset.
-export function formatDigest(dataset = {}, { top = 5, trends = 3, minPerHandle = 0 } = {}) {
+export function formatDigest(dataset = {}, { top = 5, trends = 3, minPerHandle = 0, recs = 3 } = {}) {
   const label = dataset.label || dataset.niche || "niche";
   const date = String(dataset.generatedAt || "").slice(0, 10) || "—";
-  // Inspiration-lane reels are out-of-niche format references — keep them out of the niche digest.
-  const reels = (dataset.reels || []).filter((r) => r.trackingCategory !== "inspiration");
+  // Inspiration-lane and off-topic reels are not niche signal — keep them out of the digest.
+  const reels = (dataset.reels || []).filter((r) => r.trackingCategory !== "inspiration" && r.offTopic !== true);
   const lines = [`🛰️ <b>Viral Radar — ${escapeHtml(label)}</b>`, escapeHtml(date)];
 
   // Top reels
@@ -136,6 +136,17 @@ export function formatDigest(dataset = {}, { top = 5, trends = 3, minPerHandle =
     for (const t of tr) {
       const tag = t.icon ? `${t.icon} ` : t.platform ? `${escapeHtml(t.platform)}: ` : "• ";
       lines.push(`${tag}${link(t.url, t.title)}`);
+    }
+  }
+
+  // Creator recommendations — surfaced only, NEVER auto-added (the user decides via /viral-competitor).
+  const rex = (dataset.recommendations || []).slice(0, Math.max(0, recs));
+  if (rex.length) {
+    lines.push("", `🔎 <b>Consider tracking</b> (reply /viral-competitor to add)`);
+    for (const c of rex) {
+      const why = [c.relevantReels != null ? `${c.relevantReels} niche reels` : null, c.bestViews ? `best ${formatViews(c.bestViews)}` : null]
+        .filter(Boolean).join(" · ");
+      lines.push(`• ${link(c.profile, "@" + String(c.handle || "").replace(/^@/, ""))}${why ? ` — ${escapeHtml(why)}` : ""}`);
     }
   }
 
