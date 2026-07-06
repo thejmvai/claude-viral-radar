@@ -32,7 +32,7 @@ Optional (not installed automatically):
 git clone https://github.com/thejmvai/claude-viral-radar && cd claude-viral-radar && ./install.sh
 ```
 
-`install.sh` is a one-stop installer: it checks for and installs **yt-dlp** + **ffmpeg** (via Homebrew on macOS or apt on Linux), adds the **chrome-devtools MCP**, and installs **all three skills** into `~/.claude/skills/` — **viral-radar** and **viral-competitor** from this repo, plus **last30days** (trend research) fetched from its [upstream repo](https://github.com/mvanhorn/last30days-skill). It is safe to re-run and only installs what is missing. Restart Claude Code afterward so the skills and MCP load.
+`install.sh` is a one-stop installer: it checks for and installs **yt-dlp** + **ffmpeg** (via Homebrew on macOS or apt on Linux), adds the **chrome-devtools MCP**, and installs **all four skills** into `~/.claude/skills/` — **viral-radar**, **viral-competitor**, and **viral-saved** from this repo, plus **last30days** (trend research) fetched from its [upstream repo](https://github.com/mvanhorn/last30days-skill). It is safe to re-run and only installs what is missing. Restart Claude Code afterward so the skills and MCP load.
 
 ---
 
@@ -85,6 +85,20 @@ The bundled [last30days](https://github.com/mvanhorn/last30days-skill) skill res
 - Keeps **every** viral reel (≥5 per creator), never a curated handful.
 - Ranks by **recency-weighted signal** — fresh + high-engagement reels rise to the top.
 - **Quarantines "boosted" reels** (big views, weak like-rate) so paid-looking reach doesn't pollute your lessons.
+
+---
+
+## Swipe file from your own saves (`/viral-saved`)
+
+Point the same pipeline at **your own Instagram Saved collection** instead of a competitor's grid. Your saves are private — no API can see them — so this runs only through the debug Chrome *you* are logged into, the same browser profile the radar uses.
+
+```
+/viral-saved
+```
+
+It scrapes your saved reels, downloads frames + transcripts, and renders a **swipe file** rather than a leaderboard: it leads with the cross-reel synthesis + replicable plays, groups reels by hook archetype (Contrarian reversal, Tool demo, Rapid tips…), and shows engagement only as context — ranking hand-picked saves by virality would be meaningless. Output lands in `viral-radar-out/saved/` (worklist, `frames/`, and `swipe-file.html`).
+
+Needs the same `yt-dlp` + `ffmpeg` the installer sets up, plus **whisper** for local transcripts (`pip install openai-whisper`). Read-only against Instagram, like the rest of the radar.
 
 ---
 
