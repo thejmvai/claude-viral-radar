@@ -1,8 +1,8 @@
 #!/bin/sh
 # Viral Radar setup. One-stop installer: checks/installs the dependencies, adds
 # the chrome-devtools MCP, and installs every skill the app needs into
-# ~/.claude/skills/ -- viral-radar + viral-competitor (this repo) and the
-# last30days trend skill (fetched from its upstream repo).
+# ~/.claude/skills/ -- viral-radar + viral-competitor + viral-saved (this repo)
+# and the last30days trend skill (fetched from its upstream repo).
 # Safe to re-run: it only installs what is missing and always refreshes skills.
 
 say()  { printf "\n\033[1m%s\033[0m\n" "$1"; }
@@ -71,8 +71,8 @@ fi
 say "Installing the skills..."
 DEST="${HOME}/.claude/skills"
 mkdir -p "$DEST"
-cp -R skills/viral-radar "$DEST/" && cp -R skills/viral-competitor "$DEST/" \
-  && ok "viral-radar + viral-competitor -> $DEST" \
+cp -R skills/viral-radar "$DEST/" && cp -R skills/viral-competitor "$DEST/" && cp -R skills/viral-saved "$DEST/" \
+  && ok "viral-radar + viral-competitor + viral-saved -> $DEST" \
   || warn "Could not copy skills into $DEST"
 
 # --- Python 3.12+ (required by the last30days trend skill) -------------------
