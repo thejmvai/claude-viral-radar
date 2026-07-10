@@ -59,8 +59,20 @@
     "machine learning",
     "midjourney",
     "gemini",
-    "grok"
+    "grok",
+    "composio",
+    "mcp",
+    "connector",
+    "connectors",
+    "notebooklm"
   ],
   "nicheMinKeywordHits": 2,
+  "nicheStrongKeywords": [
+    "claude",
+    "claude code",
+    "anthropic",
+    "chatgpt",
+    "openai"
+  ],
   "keepArchives": 5
 }
