@@ -2,6 +2,10 @@
 // (a motivational creator's gym reel going viral tells the AI radar nothing). Deterministic keyword
 // scoring over the text we already have (caption + hook + transcript): word-boundary matches against
 // config.nicheKeywords, distinct-keyword hit count, off-topic below config.nicheMinKeywordHits.
+// STRONG TIER: one hit on any config.nicheStrongKeywords keyword (names that alone prove the niche,
+// e.g. "claude", "anthropic") marks the reel on-niche regardless of the distinct-hit count — fixes the
+// false negative where a reel says "Claude" ten times but that counts as ONE distinct keyword and the
+// min-2 rule throws it out (live miss: the Composio-for-Claude reel, 2026-07-10).
 // Off-topic reels are kept (ds.offTopic) but leave the ranking, synthesis, digest, and Ideator.
 // Also powers discovery: a recommended creator must have >= discoveryMinNicheReels RELEVANT reels,
 // not merely search-matched ones — that is what keeps off-niche giants out of the picks.
@@ -31,15 +35,22 @@ export function scoreRelevance(reel = {}, keywords = []) {
 }
 
 // Tag every reel. Inspiration-lane reels are expected off-niche (tracked for craft) — never flagged.
-// Returns new objects; does not mutate.
+// A single nicheStrongKeywords hit is on-niche outright; otherwise nicheMinKeywordHits distinct
+// nicheKeywords are required. Returns new objects; does not mutate.
 export function tagRelevance(reels = [], cfg = {}) {
   const keywords = cfg.nicheKeywords || [];
+  const strong = cfg.nicheStrongKeywords || [];
   const min = Number(cfg.nicheMinKeywordHits ?? 2);
-  if (!keywords.length) return reels.map((r) => ({ ...r })); // no keywords configured -> no-op
+  if (!keywords.length && !strong.length) return reels.map((r) => ({ ...r })); // nothing configured -> no-op
   return reels.map((r) => {
     if (r.trackingCategory === "inspiration") return { ...r };
     const { hits, matched } = scoreRelevance(r, keywords);
-    return { ...r, nicheRelevance: { hits, matched }, offTopic: hits < min };
+    const strongMatched = strong.length ? scoreRelevance(r, strong).matched : [];
+    return {
+      ...r,
+      nicheRelevance: { hits, matched, strongMatched },
+      offTopic: hits < min && strongMatched.length === 0,
+    };
   });
 }
 

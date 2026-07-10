@@ -196,7 +196,9 @@ For each reel:
 
 A tracked creator's viral reel is not automatically niche signal (their gym reel going viral teaches the
 AI radar nothing). After enrichment, tag every new reel with `tagRelevance` from `scripts/relevance.mjs`
-(config `nicheKeywords` + `nicheMinKeywordHits`, word-boundary matching over caption + hook + transcript):
+(config `nicheKeywords` + `nicheMinKeywordHits`, word-boundary matching over caption + hook + transcript;
+one hit on a `nicheStrongKeywords` entry — names that alone prove the niche, e.g. "claude" — passes
+outright, so a reel that only ever says "Claude" can't be flagged off-topic):
 
 - `offTopic: false` → continues to Step 4 ranking as normal (keeps its `nicheRelevance` evidence).
 - `offTopic: true` → goes to the dataset's **`offTopic` array** (NOT `reels`): kept and rendered in its own
