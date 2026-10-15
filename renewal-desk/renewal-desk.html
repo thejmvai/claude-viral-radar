@@ -1,0 +1,1060 @@
+<title>Renewal Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: dealer's service-desk console. Speedometer of renewal rate up top, today's call queue beside the full book, playbook below. */
+:root {
+  --bg: #EDF1EF; --surface: #FFFFFF; --surface-2: #F5F8F7; --ink: #13201C; --muted: #5B6A66; --line: #D4DCD9;
+  --accent: #0D6B59; --accent-ink: #FFFFFF; --accent-soft: #DBEEE8;
+  --ok: #17703E; --ok-soft: #E0F2E7; --warn: #8A5509; --warn-soft: #FBEFD9; --bad: #A8311E; --bad-soft: #FBE4DF;
+  --info: #3A5F86; --info-soft: #E3EBF4;
+  --plate-bg: #13201C; --plate-ink: #F4F7F6;
+  --shadow: 0 1px 2px rgba(19,32,28,.06), 0 6px 20px rgba(19,32,28,.06);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1513; --surface: #151F1C; --surface-2: #1A2622; --ink: #E4EDEA; --muted: #92A39E; --line: #2A3733;
+    --accent: #45B89D; --accent-ink: #062019; --accent-soft: #173A32;
+    --ok: #52C483; --ok-soft: #133222; --warn: #E2A64B; --warn-soft: #3A2B12; --bad: #F2735F; --bad-soft: #3D1C16;
+    --info: #86AEDB; --info-soft: #1A2A3C;
+    --plate-bg: #E4EDEA; --plate-ink: #0E1513;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1513; --surface: #151F1C; --surface-2: #1A2622; --ink: #E4EDEA; --muted: #92A39E; --line: #2A3733;
+  --accent: #45B89D; --accent-ink: #062019; --accent-soft: #173A32;
+  --ok: #52C483; --ok-soft: #133222; --warn: #E2A64B; --warn-soft: #3A2B12; --bad: #F2735F; --bad-soft: #3D1C16;
+  --info: #86AEDB; --info-soft: #1A2A3C;
+  --plate-bg: #E4EDEA; --plate-ink: #0E1513;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 20px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h2 { font-size: 22px; }
+h3 { font-size: 17px; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-block: 20px 4px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 34px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.brand .dealer { color: var(--muted); font-size: 13px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink); white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); }
+.btn.danger.armed { background: var(--bad); color: var(--surface); border-color: var(--bad); }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.banner { border: 1px dashed var(--line); background: var(--surface-2); border-radius: 10px; padding: 10px 14px; color: var(--muted); font-size: 13px; }
+
+/* Hero: gauge + KPIs */
+.hero { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); min-width: 0; }
+.gauge-card { padding: 18px 20px 16px; display: grid; gap: 6px; }
+.gauge-card svg { width: 100%; max-width: 360px; height: auto; display: block; margin: 0 auto; }
+.gauge-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.gauge-verdict { font-size: 14px; }
+.gauge-verdict strong { color: var(--ink); }
+
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.kpi { padding: 16px 18px; display: grid; gap: 4px; align-content: start; border-left: 4px solid var(--line); }
+.kpi.sev-bad { border-left-color: var(--bad); }
+.kpi.sev-warn { border-left-color: var(--warn); }
+.kpi.sev-ok { border-left-color: var(--ok); }
+.kpi.sev-accent { border-left-color: var(--accent); }
+.kpi .value { font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpi .value small { font-size: 18px; color: var(--muted); font-weight: 500; }
+.kpi .sub { font-size: 13px; color: var(--muted); }
+
+/* Work area */
+.work { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 20px; align-items: start; }
+.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 16px 18px 10px; flex-wrap: wrap; }
+.queue { display: grid; }
+.queue-list { list-style: none; margin: 0; padding: 0 8px 10px; display: grid; gap: 2px; max-height: 640px; overflow-y: auto; }
+.q-item { display: grid; grid-template-columns: 6px 1fr auto; gap: 12px; align-items: center; padding: 10px; border-radius: 10px; cursor: pointer; border: 0; background: transparent; text-align: left; width: 100%; }
+.q-item:hover { background: var(--surface-2); }
+.q-item .stripe { align-self: stretch; border-radius: 3px; background: var(--info); }
+.q-item.sev-bad .stripe { background: var(--bad); }
+.q-item.sev-warn .stripe { background: var(--warn); }
+.q-item .who { font-weight: 600; }
+.q-item .why { font-size: 12.5px; color: var(--muted); }
+.q-item .when { font-family: var(--font-display); font-size: 20px; font-weight: 600; text-align: right; line-height: 1; font-variant-numeric: tabular-nums; }
+.q-item .when small { display: block; font-family: var(--font-body); font-size: 11px; color: var(--muted); font-weight: 500; }
+.empty { padding: 24px 18px 28px; color: var(--muted); display: grid; gap: 10px; justify-items: start; }
+.empty strong { color: var(--ink); font-size: 15px; }
+
+.book { display: grid; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 18px 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip[aria-pressed="true"] .n { color: inherit; opacity: .7; }
+.search { flex: 1 1 200px; min-width: 0; border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 7px 12px; }
+.table-scroll { overflow-x: auto; border-top: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; min-width: 880px; }
+th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+th.r, td.r { text-align: right; white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+.cname { font-weight: 600; }
+.csub { font-size: 12.5px; color: var(--muted); }
+.plate { font-family: var(--font-mono); font-weight: 600; font-size: 12px; letter-spacing: .08em; background: var(--plate-bg); color: var(--plate-ink); padding: 3px 7px; border-radius: 4px; white-space: nowrap; display: inline-block; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.pill.accent { background: var(--accent-soft); color: var(--accent); }
+.tag-example { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+
+/* Lower */
+.lower { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
+.playbook { padding: 0 18px 18px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.step { display: grid; grid-template-columns: 64px 1fr; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.step:first-child { border-top: 0; }
+.step .t { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.step .t small { display: block; font-family: var(--font-body); font-size: 11px; font-weight: 500; color: var(--muted); margin-top: 3px; }
+.step p { margin: 2px 0 0; color: var(--muted); max-width: 62ch; }
+.step b { font-weight: 600; color: var(--ink); }
+.reasons { padding: 0 18px 18px; display: grid; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: minmax(120px, 170px) 1fr 28px; gap: 10px; align-items: center; font-size: 13px; }
+.bar-track { height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 5px; background: var(--bad); opacity: .85; }
+.tips { margin: 6px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); font-size: 13px; }
+
+.foot { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+
+/* Dialogs */
+dialog { border: 1px solid var(--line); border-radius: 16px; padding: 0; background: var(--surface); color: var(--ink); width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 32px); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(10,18,16,.45); }
+.dlg-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 20px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.dlg-head .title-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.dlg-body { padding: 16px 20px 20px; display: grid; gap: 18px; }
+.x { border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); padding: 2px 6px; border-radius: 6px; }
+.x:hover { color: var(--ink); background: var(--surface-2); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.form-grid .full { grid-column: 1 / -1; }
+label.f { display: grid; gap: 4px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+label.f input, label.f select, label.f textarea, textarea.f { border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 8px; padding: 8px 10px; font-size: 14px; width: 100%; min-width: 0; }
+textarea { resize: vertical; }
+.req { color: var(--bad); }
+.dlg-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding: 0 20px; }
+.tab { border: 0; background: transparent; padding: 10px 12px; cursor: pointer; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fact { display: grid; gap: 2px; min-width: 0; }
+.fact .v { font-weight: 600; overflow-wrap: anywhere; }
+.contact-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.phone { font-family: var(--font-mono); font-size: 15px; font-weight: 600; user-select: all; }
+.script { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+.script p { margin: 0; white-space: pre-wrap; }
+.section { display: grid; gap: 10px; }
+.box { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 12px; }
+.close-cycle { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.timeline li { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.timeline li:first-child { border-top: 0; }
+.timeline .d { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 13.5px; box-shadow: var(--shadow); z-index: 50; max-width: calc(100vw - 32px); }
+
+@media (max-width: 960px) {
+  .hero, .work, .lower { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi { padding: 12px 14px; }
+  .kpi .value { font-size: 32px; }
+  .form-grid, .facts, .close-cycle { grid-template-columns: 1fr; }
+  .brand h1 { font-size: 28px; }
+  .step { grid-template-columns: 52px 1fr; }
+  .bar-row { grid-template-columns: 110px 1fr 24px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .needle { transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Renewal Desk</h1>
+      <span class="dealer" id="dealerName">Motor insurance renewals</span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnSettings" type="button">Settings</button>
+      <button class="btn" id="btnExport" type="button" hidden>Export CSV</button>
+      <button class="btn primary" id="btnAdd" type="button">+ Add client</button>
+    </div>
+  </header>
+
+  <div class="banner" id="modeBanner" hidden></div>
+
+  <section class="hero" aria-label="Renewal performance">
+    <div class="card gauge-card">
+      <div class="eyebrow">Renewal rate · last 12 months</div>
+      <svg id="gauge" viewBox="0 0 240 172" role="img" aria-label="Renewal rate gauge"></svg>
+      <div class="gauge-verdict" id="gaugeVerdict">Loading your book…</div>
+      <div class="gauge-foot"><span id="gaugeCounts"></span><span id="gaugeTarget"></span></div>
+    </div>
+    <div class="kpis">
+      <div class="card kpi sev-accent">
+        <div class="eyebrow">To hit target</div>
+        <div class="value num" id="kNeed">–</div>
+        <div class="sub" id="kNeedSub">Renewals needed from policies due in the next 90 days</div>
+      </div>
+      <div class="card kpi sev-warn">
+        <div class="eyebrow">Calls due now</div>
+        <div class="value num" id="kCalls">–</div>
+        <div class="sub" id="kCallsSub">Follow-ups and cadence touches waiting</div>
+      </div>
+      <div class="card kpi">
+        <div class="eyebrow">Expiring in 30 days</div>
+        <div class="value num" id="k30">–</div>
+        <div class="sub" id="k30Sub">Premium at stake</div>
+      </div>
+      <div class="card kpi sev-bad">
+        <div class="eyebrow">Lapsed, not renewed</div>
+        <div class="value num" id="kLapsed">–</div>
+        <div class="sub" id="kLapsedSub">Expired policies still open</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="work">
+    <div class="card queue">
+      <div class="panel-head">
+        <h2>Today's calls</h2>
+        <span class="muted num" id="queueCount"></span>
+      </div>
+      <ul class="queue-list" id="queue"></ul>
+    </div>
+
+    <div class="card book">
+      <div class="panel-head">
+        <h2>Client book</h2>
+        <span class="muted num" id="bookCount"></span>
+      </div>
+      <div class="toolbar">
+        <div class="chips" id="filters" role="group" aria-label="Filter clients"></div>
+        <input class="search" id="search" type="search" placeholder="Search name, plate, phone, policy…" aria-label="Search clients">
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Client &amp; vehicle</th><th>Plate</th><th>Insurer</th><th>Expiry</th><th class="r">Premium</th><th>Stage</th><th>Last contact</th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="bookEmpty" hidden></div>
+    </div>
+  </section>
+
+  <section class="lower">
+    <div class="card">
+      <div class="panel-head"><h2>The 90% cadence</h2><span class="muted">Touches counted back from policy expiry</span></div>
+      <div class="playbook">
+        <ol class="steps">
+          <li class="step"><div class="t">T-60<small>days</small></div><div><b>Heads-up and data check.</b><p>Confirm drivers, address and any modifications. Tell them you are shopping their renewal now. Early contact is the biggest single lever on retention.</p></div></li>
+          <li class="step"><div class="t">T-30<small>days</small></div><div><b>Quote in hand.</b><p>Send the renewal premium with NCD shown. If the price rose, re-market with a second insurer before they do it themselves.</p></div></li>
+          <li class="step"><div class="t">T-14<small>days</small></div><div><b>Close.</b><p>Call, don't text. Handle the price objection, offer instalments, and ask for the go-ahead.</p></div></li>
+          <li class="step"><div class="t">T-7<small>days</small></div><div><b>Urgency.</b><p>Remind them road tax renewal needs valid cover. Book a time to settle payment.</p></div></li>
+          <li class="step"><div class="t">T-3<small>days</small></div><div><b>Last call before lapse.</b><p>Escalate to the salesperson who sold them the car. A familiar voice converts fence-sitters.</p></div></li>
+          <li class="step"><div class="t">T-0<small>expiry</small></div><div><b>Expiry day.</b><p>Final reminder that cover ends at midnight. Anything still open becomes a win-back.</p></div></li>
+          <li class="step"><div class="t">T+30<small>after</small></div><div><b>Win-back window.</b><p>Lapsed clients stay in the call queue for 30 days. After that, record them as lost with a reason so you can fix the cause.</p></div></li>
+        </ol>
+      </div>
+    </div>
+    <div class="card">
+      <div class="panel-head"><h2>Why clients leave</h2><span class="muted">Lost renewals, last 12 months</span></div>
+      <div class="reasons" id="reasons"></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span id="storeNote">Connecting to your saved client book…</span>
+    <span>Rate = renewed ÷ (renewed + lost), by decision date.</span>
+  </footer>
+</div>
+
+<!-- Client detail -->
+<dialog id="dlgClient" aria-labelledby="dcName">
+  <div class="dlg-head">
+    <div style="display:grid;gap:6px;min-width:0">
+      <div class="title-line"><h2 id="dcName"></h2><span id="dcPlate"></span><span id="dcStatus"></span></div>
+      <div class="csub" id="dcVehicle"></div>
+    </div>
+    <button class="x" type="button" data-close aria-label="Close">×</button>
+  </div>
+  <div class="dlg-body" id="dcBody"></div>
+</dialog>
+
+<!-- Add / edit client -->
+<dialog id="dlgEdit" aria-labelledby="deTitle">
+  <div class="dlg-head">
+    <h2 id="deTitle">Add client</h2>
+    <button class="x" type="button" data-close aria-label="Close">×</button>
+  </div>
+  <div class="tabs" role="tablist" id="editTabs">
+    <button class="tab" role="tab" type="button" aria-selected="true" data-tab="one">One client</button>
+    <button class="tab" role="tab" type="button" aria-selected="false" data-tab="csv">Import a list</button>
+  </div>
+  <form class="dlg-body" id="formClient" autocomplete="off">
+    <div class="form-grid">
+      <label class="f">Client name <span class="req">*</span><input id="fName" name="name" required></label>
+      <label class="f">Mobile number <span class="req">*</span><input id="fPhone" name="phone" type="tel" required placeholder="+60 12-345 6789"></label>
+      <label class="f">Email<input id="fEmail" name="email" type="email"></label>
+      <label class="f">Vehicle<input id="fVehicle" name="vehicle" placeholder="2019 Honda City 1.5 V"></label>
+      <label class="f">Plate number<input id="fPlate" name="plate" placeholder="WXY 1234"></label>
+      <label class="f">Insurer<input id="fInsurer" name="insurer" list="insurerList"></label>
+      <label class="f">Policy number<input id="fPolicy" name="policyNo"></label>
+      <label class="f">Policy expiry <span class="req">*</span><input id="fExpiry" name="expiry" type="date" required></label>
+      <label class="f">Annual premium<input id="fPremium" name="premium" type="number" min="0" step="1"></label>
+      <label class="f">NCD %<input id="fNcd" name="ncd" type="number" min="0" max="100" step="1"></label>
+      <label class="f full">Notes<textarea id="fNotes" name="notes" rows="2" placeholder="Bought from us in 2023, prefers WhatsApp, price-sensitive…"></textarea></label>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit" id="fSubmit">Add client</button>
+    </div>
+  </form>
+  <form class="dlg-body" id="formCsv" hidden>
+    <p class="muted" style="margin:0">Paste rows from a spreadsheet, or choose a .csv file. The first row must be a header. Recognised columns: <b>name, phone, email, vehicle, plate, insurer, policy, expiry, premium, ncd, notes</b>. Dates as YYYY-MM-DD or DD/MM/YYYY.</p>
+    <label class="f">CSV file<input id="csvFile" type="file" accept=".csv,text/csv,text/plain"></label>
+    <textarea class="f" id="csvText" rows="8" placeholder="name,phone,vehicle,plate,insurer,expiry,premium&#10;Aisyah Rahman,+60123456789,2020 Toyota Vios,VBK 2231,Etiqa,2026-12-02,1850"></textarea>
+    <div class="muted" id="csvPreview"></div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit" id="csvSubmit" disabled>Import</button>
+    </div>
+  </form>
+  <datalist id="insurerList"></datalist>
+</dialog>
+
+<!-- Settings -->
+<dialog id="dlgSettings" aria-labelledby="dsTitle">
+  <div class="dlg-head">
+    <h2 id="dsTitle">Settings</h2>
+    <button class="x" type="button" data-close aria-label="Close">×</button>
+  </div>
+  <form class="dlg-body" id="formSettings">
+    <div class="form-grid">
+      <label class="f">Dealership name<input id="sDealer" placeholder="Used in message templates"></label>
+      <label class="f">Your name<input id="sAgent" placeholder="Signs off messages"></label>
+      <label class="f">Currency label<input id="sCurrency" maxlength="5"></label>
+      <label class="f">Country calling code<input id="sCountry" inputmode="numeric" placeholder="60" maxlength="4"></label>
+      <label class="f">Renewal-rate target %<input id="sTarget" type="number" min="50" max="100" step="1"></label>
+    </div>
+    <div class="box" id="exampleBox" hidden>
+      <div><b>Example clients</b><div class="muted">The book was seeded with marked example clients so you can see how it works. Remove them when you start adding your own.</div></div>
+      <div><button class="btn danger" type="button" id="btnClearExamples">Remove example clients</button></div>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save settings</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- helpers ----------
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseD = (s) => { if (!s) return null; const [y, m, d] = String(s).split("-").map(Number); return new Date(y, m - 1, d); };
+  const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+  const todayIso = () => iso(today());
+  const daysUntil = (s) => Math.round((parseD(s) - today()) / 86400000);
+  const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); return iso(d); };
+  const addYears = (s, n) => { const d = parseD(s); d.setFullYear(d.getFullYear() + n); return iso(d); };
+  const fmtDate = (s) => s ? parseD(s).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "–";
+  const fmtShort = (s) => s ? parseD(s).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "–";
+  const uid = () => "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const firstName = (n) => String(n || "").trim().split(/\s+/)[0] || "there";
+
+  let settings = { dealer: "", agent: "", currency: "RM", country: "60", target: 90 };
+  let clients = [];
+  let filter = "all";
+  let query = "";
+  let openId = null;
+  let store = null;
+  let downloads = null;
+
+  const money = (n) => (n == null || n === "" || isNaN(n)) ? "–" : `${settings.currency} ${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  const toastEl = $("#toast");
+  let toastT;
+  function toast(msg) {
+    toastEl.textContent = msg; toastEl.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { toastEl.hidden = true; }, 2600);
+  }
+
+  async function copy(text, label) {
+    try { await navigator.clipboard.writeText(text); toast(`${label} copied`); }
+    catch { toast("Copy blocked here. Select the text and copy it by hand."); }
+  }
+
+  // ---------- domain ----------
+  const STAGES = { new: "Not contacted", contacted: "Contacted", quoted: "Quote sent", lost: "Lost" };
+  const CADENCE = [60, 30, 14, 7, 3, 0];
+  const LOST_REASONS = ["Price — cheaper elsewhere", "Sold the car", "Renewed via bank or other agent", "Couldn't reach client", "Unhappy with a claim", "Other"];
+  const CHANNELS = ["Call", "WhatsApp", "SMS", "Email", "Walk-in"];
+  const OUTCOMES = ["Reached — interested", "Reached — quote sent", "Reached — thinking it over", "Asked to call back", "No answer", "Declined"];
+
+  const lastTouch = (c) => (c.touches || []).reduce((m, t) => (t.at > m ? t.at : m), "") || null;
+  const lastOutcome = (c) => (c.history || []).slice().sort((a, b) => (a.at < b.at ? 1 : -1))[0] || null;
+
+  function status(c) {
+    const days = daysUntil(c.expiry);
+    if (c.stage === "lost") return { key: "lost", label: "Lost", cls: "" };
+    const lo = lastOutcome(c);
+    if (lo && lo.result === "renewed" && days > 90 && daysUntil(lo.at) > -60) return { key: "renewed", label: "Renewed", cls: "ok" };
+    if (days < 0) return { key: "expired", label: `Lapsed ${-days}d`, cls: "bad" };
+    if (days <= 7) return { key: "due30", label: days === 0 ? "Expires today" : `${days}d left`, cls: "bad" };
+    if (days <= 30) return { key: "due30", label: `${days}d left`, cls: "warn" };
+    if (days <= 90) return { key: "due90", label: `${days}d left`, cls: "info" };
+    return { key: "later", label: `${days}d left`, cls: "" };
+  }
+
+  // What, if anything, the agent should do about this client today.
+  function dueInfo(c) {
+    if (c.stage === "lost") return null;
+    const days = daysUntil(c.expiry);
+    const t = todayIso();
+    if (c.followUp) {
+      if (c.followUp < t) return { sev: "bad", days, point: null, why: `Follow-up overdue since ${fmtShort(c.followUp)}` };
+      if (c.followUp === t) return { sev: "warn", days, point: null, why: "Follow-up booked for today" };
+      return null; // a future follow-up is booked; respect it
+    }
+    if (days < -30 || days > 60) return null;
+    const last = lastTouch(c);
+    if (days < 0) {
+      if (last && last >= c.expiry && daysUntil(last) > -3) return null;
+      return { sev: "bad", days, point: "lapsed", why: "Lapsed — win-back call" };
+    }
+    const point = CADENCE.filter((p) => p >= days).pop();
+    if (last && last >= addDays(c.expiry, -point)) return null;
+    const why = (point === 0 ? "Expiry-day reminder" : `T-${point} touch`) + (last ? "" : " · never contacted");
+    return { sev: days <= 7 ? "bad" : days <= 30 ? "warn" : "info", days, point, why };
+  }
+
+  function rateStats() {
+    const since = addDays(todayIso(), -365);
+    let renewed = 0, lost = 0;
+    const reasons = {};
+    for (const c of clients) for (const h of c.history || []) {
+      if (h.at < since || h.at > todayIso()) continue;
+      if (h.result === "renewed") renewed++;
+      else if (h.result === "lost") { lost++; const r = h.reason || "Other"; reasons[r] = (reasons[r] || 0) + 1; }
+    }
+    const total = renewed + lost;
+    const open90 = clients.filter((c) => c.stage !== "lost" && status(c).key !== "renewed" && daysUntil(c.expiry) <= 90 && daysUntil(c.expiry) >= -30);
+    return { renewed, lost, total, rate: total ? (renewed / total) * 100 : null, reasons, open90 };
+  }
+
+  function messageFor(c, point) {
+    const name = firstName(c.name);
+    const car = c.vehicle || "car";
+    const dealer = settings.dealer || "the dealership";
+    const sign = settings.agent ? `\n\n— ${settings.agent}, ${dealer}` : `\n\n— ${dealer}`;
+    const ins = c.insurer ? ` with ${c.insurer}` : "";
+    const date = fmtDate(c.expiry);
+    const prem = c.premium ? ` Your current premium is ${money(c.premium)}${c.ncd ? ` with ${c.ncd}% NCD` : ""}.` : "";
+    if (point === "lapsed") return `Hi ${name}, your ${car} insurance${ins} expired on ${date}. Driving without cover leaves you personally liable, and road tax can't be renewed without it. We can get you covered again today. Shall I send the quote?${sign}`;
+    if (point === 0) return `Hi ${name}, a reminder that your ${car} insurance${ins} ends tonight (${date}). Reply YES and we'll renew it right away so you stay covered.${sign}`;
+    if (point === 3 || point === 7) return `Hi ${name}, your ${car} insurance${ins} expires on ${date}, ${daysUntil(c.expiry)} days from now.${prem} Your road tax renewal needs valid cover. Can we lock in your renewal today? Instalment options available.${sign}`;
+    if (point === 14 || point === 30) return `Hi ${name}, your renewal quote for the ${car} is ready.${prem} Cover ends on ${date}. Reply YES to renew, or call me and I'll walk you through the options.${sign}`;
+    return `Hi ${name}, hope the ${car} is running well! Your insurance${ins} is due on ${date}. We're preparing your renewal now. Any changes to drivers, address or modifications we should know about?${sign}`;
+  }
+
+  function waLink(phone, text) {
+    let p = String(phone || "").trim();
+    let digits = p.replace(/\D/g, "");
+    if (!digits) return null;
+    if (!p.startsWith("+") && digits.startsWith("0") && settings.country) digits = settings.country.replace(/\D/g, "") + digits.slice(1);
+    return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  }
+
+  // ---------- storage ----------
+  function makeLocalStore() {
+    const KEY = "renewal-desk-v1";
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { clients: {}, settings: null }; } catch { return { clients: {}, settings: null }; } };
+    const write = (s) => { try { localStorage.setItem(KEY, JSON.stringify(s)); return true; } catch { return false; } };
+    let onClients = () => {}, onSettings = () => {};
+    const emit = () => { const s = read(); onClients(Object.entries(s.clients).map(([id, v]) => ({ ...v, id }))); if (s.settings) onSettings(s.settings); };
+    return {
+      mode: "local",
+      subscribe(cb, sb) { onClients = cb; onSettings = sb; emit(); },
+      async save(c) { const s = read(); const { id, ...body } = c; s.clients[id] = body; if (!write(s)) throw new Error("storage"); emit(); },
+      async remove(id) { const s = read(); delete s.clients[id]; write(s); emit(); },
+      async saveSettings(v) { const s = read(); s.settings = v; write(s); emit(); },
+    };
+  }
+
+  function makeDbStore(db) {
+    const queues = {};
+    const serial = (id, fn) => (queues[id] = (queues[id] || Promise.resolve()).catch(() => {}).then(fn));
+    return {
+      mode: "db",
+      subscribe(cb, sb) {
+        db.collection("clients").onSnapshot(
+          (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
+          () => setNote("Lost the live connection to your client book. Reload the page to reconnect.")
+        );
+        db.doc("settings/main").onSnapshot((d) => { if (d.exists) sb(d.data()); }, () => {});
+      },
+      save(c) { const { id, ...body } = c; return serial(id, () => db.collection("clients").doc(id).set(JSON.parse(JSON.stringify(body)))); },
+      remove(id) { return serial(id, () => db.collection("clients").doc(id).delete()); },
+      saveSettings(v) { return serial("settings", () => db.doc("settings/main").set(v)); },
+    };
+  }
+
+  function setNote(t) { $("#storeNote").textContent = t; }
+
+  async function save(c) {
+    try { await store.save(c); return true; }
+    catch (e) {
+      if (e && e.code === "invalid_argument") toast("You have view-only access, so changes can't be saved.");
+      else if (e && e.code === "quota_exceeded") toast("The client book is full. Remove old or example clients, then try again.");
+      else toast("Couldn't save. Check your connection and try again.");
+      return false;
+    }
+  }
+
+  // ---------- rendering ----------
+  function renderGauge(stats) {
+    const svg = $("#gauge");
+    const cx = 120, cy = 116, r = 98, min = 50, max = 100;
+    const ang = (v) => Math.PI * (1 - (Math.min(max, Math.max(min, v)) - min) / (max - min));
+    const pt = (v, rad) => [cx + rad * Math.cos(ang(v)), cy - rad * Math.sin(ang(v))];
+    const arc = (a, b, rad) => { const [x1, y1] = pt(a, rad), [x2, y2] = pt(b, rad); return `M${x1.toFixed(2)} ${y1.toFixed(2)} A${rad} ${rad} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`; };
+    const target = Number(settings.target) || 90;
+    const rate = stats.rate;
+    const col = rate == null ? "var(--muted)" : rate >= target ? "var(--ok)" : rate >= target - 10 ? "var(--warn)" : "var(--bad)";
+    let ticks = "";
+    for (let v = 50; v <= 100; v += 10) {
+      const [x1, y1] = pt(v, r - 11), [x2, y2] = pt(v, r - 17), [lx, ly] = pt(v, r - 30);
+      ticks += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--muted)" stroke-width="1.5"/>`;
+      ticks += `<text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font-mono)">${v}</text>`;
+    }
+    for (let v = 55; v < 100; v += 10) { const [x1, y1] = pt(v, r - 11), [x2, y2] = pt(v, r - 14); ticks += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--muted)" stroke-width="1"/>`; }
+    const [tx1, ty1] = pt(target, r + 10), [tx2, ty2] = pt(target, r - 10);
+    const needleA = rate == null ? 180 : 180 * (1 - (Math.min(max, Math.max(min, rate)) - min) / (max - min));
+    svg.innerHTML = `
+      <path d="${arc(min, max, r)}" fill="none" stroke="var(--surface-2)" stroke-width="14" stroke-linecap="round"/>
+      <path d="${arc(target, max, r)}" fill="none" stroke="var(--ok-soft)" stroke-width="14"/>
+      ${rate != null && rate > min ? `<path d="${arc(min, rate, r)}" fill="none" stroke="${col}" stroke-width="14" stroke-linecap="round"/>` : ""}
+      ${ticks}
+      <line x1="${tx1}" y1="${ty1}" x2="${tx2}" y2="${ty2}" stroke="var(--ink)" stroke-width="2.5"/>
+      <g class="needle" style="transform-origin:${cx}px ${cy}px;transform:rotate(${-needleA}deg)">
+        <line x1="${cx}" y1="${cy}" x2="${cx + r - 26}" y2="${cy}" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="var(--ink)"/>
+      <text x="${cx}" y="${cy + 48}" text-anchor="middle" font-size="42" font-weight="700" fill="${col}" font-family="var(--font-display)">${rate == null ? "–" : rate.toFixed(1) + "%"}</text>`;
+    // needle rotation: 0deg points right (100%), rotate negative to go counter-clockwise toward 50%
+    const verdict = $("#gaugeVerdict");
+    if (rate == null) verdict.innerHTML = "No renewals or losses recorded in the last 12 months yet. Mark policies renewed or lost to start the meter.";
+    else if (rate >= target) verdict.innerHTML = `<strong>On target.</strong> You're ${(rate - target).toFixed(1)} points above ${target}%.`;
+    else verdict.innerHTML = `<strong>${(target - rate).toFixed(1)} points below target.</strong> Every save from the call list moves the needle.`;
+    $("#gaugeCounts").textContent = `${stats.renewed} renewed · ${stats.lost} lost`;
+    $("#gaugeTarget").textContent = `Target ${target}%`;
+  }
+
+  function renderKpis(stats, queue) {
+    const target = (Number(settings.target) || 90) / 100;
+    const M = stats.open90.length;
+    const need = Math.max(0, Math.ceil(target * (stats.total + M) - stats.renewed - 1e-9));
+    const kNeed = $("#kNeed"), kNeedSub = $("#kNeedSub");
+    if (M === 0) { kNeed.innerHTML = "0"; kNeedSub.textContent = "No open policies due in the next 90 days"; }
+    else if (need > M) { kNeed.innerHTML = `${M}<small> of ${M}</small>`; kNeedSub.textContent = `Renew every policy due in 90 days. Even that leaves you short of ${settings.target}% this year.`; }
+    else { kNeed.innerHTML = `${need}<small> of ${M}</small>`; kNeedSub.textContent = `Policies due in the next 90 days you must renew to reach ${settings.target}%`; }
+
+    const overdue = queue.filter((q) => q.sev === "bad").length;
+    $("#kCalls").textContent = queue.length;
+    $("#kCallsSub").textContent = queue.length ? `${overdue} urgent · ${queue.length - overdue} on cadence` : "You're caught up for today";
+
+    const d30 = clients.filter((c) => status(c).key === "due30");
+    $("#k30").textContent = d30.length;
+    $("#k30Sub").textContent = `${money(d30.reduce((s, c) => s + (Number(c.premium) || 0), 0))} premium at stake`;
+
+    const lapsed = clients.filter((c) => status(c).key === "expired");
+    $("#kLapsed").textContent = lapsed.length;
+    $("#kLapsedSub").textContent = lapsed.length ? "Win them back within 30 days, or mark lost" : "No open lapsed policies";
+  }
+
+  function buildQueue() {
+    const order = { bad: 0, warn: 1, info: 2 };
+    return clients.map((c) => ({ c, ...(dueInfo(c) || {}) })).filter((q) => q.sev)
+      .sort((a, b) => order[a.sev] - order[b.sev] || a.days - b.days);
+  }
+
+  function renderQueue(queue) {
+    const ul = $("#queue");
+    $("#queueCount").textContent = queue.length ? `${queue.length} to contact` : "";
+    if (!clients.length) { ul.innerHTML = `<li class="empty"><strong>No clients yet</strong>Add your first client and their policy expiry. The desk works out who to call and when.</li>`; return; }
+    if (!queue.length) { ul.innerHTML = `<li class="empty"><strong>All caught up</strong>Nobody is due a touch today. New tasks appear automatically as policies reach T-60, T-30, T-14, T-7, T-3 and expiry.</li>`; return; }
+    ul.innerHTML = queue.map((q) => {
+      const d = q.days;
+      const when = d < 0 ? `${-d}d<small>lapsed</small>` : d === 0 ? `0d<small>expires today</small>` : `${d}d<small>to expiry</small>`;
+      return `<li><button class="q-item sev-${q.sev}" type="button" data-open="${esc(q.c.id)}">
+        <span class="stripe"></span>
+        <span style="min-width:0"><span class="who">${esc(q.c.name)}</span>${q.c.example ? '<span class="tag-example">Example</span>' : ""}<br><span class="why">${esc(q.why)}${q.c.vehicle ? " · " + esc(q.c.vehicle) : ""}</span></span>
+        <span class="when">${when}</span></button></li>`;
+    }).join("");
+  }
+
+  const FILTERS = [
+    ["all", "All"], ["due30", "Due ≤30 days"], ["due90", "Due 31–90 days"], ["expired", "Lapsed"], ["renewed", "Renewed"], ["lost", "Lost"],
+  ];
+
+  function renderBook() {
+    const counts = {};
+    for (const c of clients) { const k = status(c).key; counts[k] = (counts[k] || 0) + 1; }
+    counts.all = clients.length;
+    $("#filters").innerHTML = FILTERS.map(([k, l]) => `<button class="chip" type="button" data-filter="${k}" aria-pressed="${filter === k}">${l}<span class="n">${counts[k] || 0}</span></button>`).join("");
+
+    const q = query.trim().toLowerCase();
+    const list = clients.filter((c) => filter === "all" || status(c).key === filter)
+      .filter((c) => !q || [c.name, c.plate, c.phone, c.policyNo, c.vehicle, c.insurer, c.email].some((v) => String(v || "").toLowerCase().includes(q)))
+      .sort((a, b) => {
+        const ra = a.stage === "lost" ? 1 : 0, rb = b.stage === "lost" ? 1 : 0;
+        return ra - rb || (a.expiry < b.expiry ? -1 : a.expiry > b.expiry ? 1 : 0);
+      });
+
+    $("#bookCount").textContent = `${clients.length} client${clients.length === 1 ? "" : "s"}`;
+    const empty = $("#bookEmpty");
+    if (!list.length) {
+      $("#rows").innerHTML = "";
+      empty.hidden = false;
+      empty.innerHTML = clients.length
+        ? `<strong>No clients match</strong>Try another filter or clear the search.`
+        : `<strong>Your client book is empty</strong>Add each buyer with their policy expiry date, or import your existing list from a spreadsheet.<button class="btn primary" type="button" data-action="add">+ Add your first client</button>`;
+      return;
+    }
+    empty.hidden = true;
+    $("#rows").innerHTML = list.map((c) => {
+      const st = status(c);
+      const last = lastTouch(c);
+      const stageLabel = st.key === "renewed" ? "Renewed" : STAGES[c.stage] || "Not contacted";
+      const stageCls = c.stage === "lost" ? "" : st.key === "renewed" ? "ok" : c.stage === "quoted" ? "accent" : c.stage === "contacted" ? "info" : (st.key === "due30" || st.key === "expired") ? "warn" : "";
+      return `<tr data-open="${esc(c.id)}" tabindex="0">
+        <td><div class="cname">${esc(c.name)}${c.example ? '<span class="tag-example">Example</span>' : ""}</div><div class="csub">${esc(c.vehicle || "—")}</div></td>
+        <td>${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : '<span class="muted">—</span>'}</td>
+        <td><div>${esc(c.insurer || "—")}</div><div class="csub">${esc(c.policyNo || "")}</div></td>
+        <td><div class="num nowrap">${fmtDate(c.expiry)}</div><span class="pill ${st.key === "renewed" || st.key === "lost" ? "" : st.cls}">${esc(st.key === "renewed" || st.key === "lost" ? `${daysUntil(c.expiry)}d left` : st.label)}</span></td>
+        <td class="r num">${money(c.premium)}</td>
+        <td><span class="pill ${stageCls}">${esc(stageLabel)}</span>${c.followUp ? `<div class="csub">Follow up ${fmtShort(c.followUp)}</div>` : ""}</td>
+        <td class="num">${last ? fmtShort(last) : '<span class="muted">Never</span>'}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function renderReasons(stats) {
+    const el = $("#reasons");
+    const entries = Object.entries(stats.reasons).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) { el.innerHTML = `<p class="muted" style="margin:0">No lost renewals recorded in the last 12 months. When you mark a client lost, pick a reason and it shows up here.</p>`; return; }
+    const max = Math.max(...entries.map((e) => e[1]));
+    el.innerHTML = entries.map(([r, n]) => `<div class="bar-row"><span>${esc(r)}</span><div class="bar-track"><div class="bar-fill" style="width:${(n / max) * 100}%"></div></div><span class="num r" style="text-align:right">${n}</span></div>`).join("")
+      + `<div class="tips">${tipFor(entries[0][0])}</div>`;
+  }
+
+  function tipFor(reason) {
+    if (reason.startsWith("Price")) return "<b>Top reason is price.</b> Get a second insurer's quote at T-30 for anyone whose premium went up, and lead with NCD and instalment options.";
+    if (reason.startsWith("Sold")) return "<b>Top reason is cars being sold.</b> Those aren't controllable losses. Offer to insure the replacement car, and ask if they're trading in with you.";
+    if (reason.startsWith("Renewed via")) return "<b>Clients are renewing elsewhere.</b> Reach them at T-60 before the bank or another agent does, and remind them claims go through you.";
+    if (reason.startsWith("Couldn't")) return "<b>Clients are unreachable.</b> Start at T-60, switch channels after two missed calls, and confirm mobile numbers at every service visit.";
+    if (reason.startsWith("Unhappy")) return "<b>Claims experience is driving losses.</b> Call clients after any claim closes, and flag repeat complaints about an insurer.";
+    return "<b>Review the notes on lost clients</b> to find the pattern, then give it a named reason.";
+  }
+
+  function render() {
+    const stats = rateStats();
+    const queue = buildQueue();
+    $("#dealerName").textContent = settings.dealer ? `${settings.dealer} · motor insurance renewals` : "Motor insurance renewals";
+    renderGauge(stats);
+    renderKpis(stats, queue);
+    renderQueue(queue);
+    renderBook();
+    renderReasons(stats);
+    $("#insurerList").innerHTML = [...new Set(clients.map((c) => c.insurer).filter(Boolean))].map((i) => `<option value="${esc(i)}">`).join("");
+    $("#exampleBox").hidden = !clients.some((c) => c.example);
+    if (openId) { const c = clients.find((x) => x.id === openId); if (c && $("#dlgClient").open) renderClient(c, true); }
+  }
+
+  // ---------- client detail ----------
+  function renderClient(c, keepForms) {
+    const st = status(c);
+    const due = dueInfo(c);
+    const point = due ? due.point : (daysUntil(c.expiry) < 0 ? "lapsed" : CADENCE.filter((p) => p >= daysUntil(c.expiry)).pop() ?? 60);
+    const msg = messageFor(c, point == null ? CADENCE.filter((p) => p >= daysUntil(c.expiry)).pop() ?? 60 : point);
+    const wa = waLink(c.phone, msg);
+
+    $("#dcName").textContent = c.name;
+    $("#dcPlate").innerHTML = c.plate ? `<span class="plate">${esc(c.plate)}</span>` : "";
+    $("#dcStatus").innerHTML = `<span class="pill ${st.cls}">${esc(st.key === "lost" ? "Lost" : st.label)}</span>` + (c.example ? '<span class="tag-example">Example</span>' : "");
+    $("#dcVehicle").textContent = [c.vehicle, c.email].filter(Boolean).join(" · ");
+
+    // preserve typed values across live re-renders
+    const keep = {};
+    if (keepForms) $("#dcBody").querySelectorAll("input, select, textarea").forEach((el) => { if (el.id) keep[el.id] = el.value; });
+
+    const events = [
+      ...(c.touches || []).map((t) => ({ at: t.at, html: `<b>${esc(t.channel)}</b> · ${esc(t.outcome)}${t.note ? ` — ${esc(t.note)}` : ""}` })),
+      ...(c.history || []).map((h) => ({ at: h.at, html: h.result === "renewed" ? `<span class="pill ok">Renewed</span> policy expiring ${fmtDate(h.expiry)}${h.premium ? ` · ${money(h.premium)}` : ""}` : `<span class="pill bad">Lost</span> ${esc(h.reason || "")}` })),
+    ].sort((a, b) => (a.at < b.at ? 1 : -1));
+
+    const closed = c.stage === "lost";
+    $("#dcBody").innerHTML = `
+      <div class="section">
+        <div class="contact-row">
+          <span class="phone">${esc(c.phone || "No number")}</span>
+          ${c.phone ? `<button class="btn small" type="button" data-copy-phone>Copy number</button>` : ""}
+          ${wa ? `<a class="btn small" href="${esc(wa)}" target="_blank" rel="noopener">Open WhatsApp with message</a>` : ""}
+        </div>
+        ${due ? `<div><span class="pill ${due.sev === "bad" ? "bad" : due.sev === "warn" ? "warn" : "info"}">${esc(due.why)}</span></div>` : ""}
+        ${closed ? "" : `<div class="script"><div class="eyebrow">Suggested message${point === "lapsed" ? " · win-back" : typeof point === "number" ? ` · T-${point}` : ""}</div><p id="dcMsg">${esc(msg)}</p><div><button class="btn small" type="button" data-copy-msg>Copy message</button></div></div>`}
+      </div>
+
+      <div class="facts">
+        <div class="fact"><span class="eyebrow">Insurer</span><span class="v">${esc(c.insurer || "—")}</span></div>
+        <div class="fact"><span class="eyebrow">Policy no.</span><span class="v" style="font-family:var(--font-mono)">${esc(c.policyNo || "—")}</span></div>
+        <div class="fact"><span class="eyebrow">Expiry</span><span class="v num">${fmtDate(c.expiry)}</span></div>
+        <div class="fact"><span class="eyebrow">Premium</span><span class="v num">${money(c.premium)}</span></div>
+        <div class="fact"><span class="eyebrow">NCD</span><span class="v num">${c.ncd !== "" && c.ncd != null ? esc(c.ncd) + "%" : "—"}</span></div>
+        <div class="fact"><span class="eyebrow">Stage</span><span class="v">${esc(STAGES[c.stage] || "Not contacted")}</span></div>
+        ${c.notes ? `<div class="fact" style="grid-column:1/-1"><span class="eyebrow">Notes</span><span class="v" style="font-weight:400;white-space:pre-wrap">${esc(c.notes)}</span></div>` : ""}
+      </div>
+
+      ${closed ? `
+      <div class="box">
+        <div><b>This client was marked lost.</b><div class="muted">If they come back, reopen the file, update the expiry date and work the cadence again.</div></div>
+        <div><button class="btn" type="button" data-reopen>Reopen as win-back</button></div>
+      </div>` : `
+      <form class="box" id="touchForm">
+        <h3>Log a contact</h3>
+        <div class="form-grid">
+          <label class="f">Date<input type="date" id="tAt" value="${todayIso()}" max="${todayIso()}" required></label>
+          <label class="f">Channel<select id="tChannel">${CHANNELS.map((x) => `<option>${x}</option>`).join("")}</select></label>
+          <label class="f">Outcome<select id="tOutcome">${OUTCOMES.map((x) => `<option>${x}</option>`).join("")}</select></label>
+          <label class="f">Next follow-up<input type="date" id="tNext" min="${todayIso()}"></label>
+          <label class="f full">Note<input id="tNote" placeholder="Wants quote with windscreen cover, call after 6pm"></label>
+        </div>
+        <div class="dlg-actions"><button class="btn primary" type="submit">Save contact</button></div>
+      </form>
+
+      <div class="close-cycle">
+        <form class="box" id="renewForm">
+          <h3>Renewed</h3>
+          <label class="f">New expiry<input type="date" id="rExpiry" value="${addYears(c.expiry, 1)}" required></label>
+          <label class="f">New premium<input type="number" id="rPremium" min="0" step="1" value="${esc(c.premium ?? "")}"></label>
+          <button class="btn primary" type="submit" style="justify-self:start">Mark renewed</button>
+        </form>
+        <form class="box" id="lostForm">
+          <h3>Lost</h3>
+          <label class="f">Reason<select id="lReason">${LOST_REASONS.map((x) => `<option>${esc(x)}</option>`).join("")}</select></label>
+          <label class="f">Detail<input id="lNote" placeholder="Went with bank's bundled policy"></label>
+          <button class="btn danger" type="submit" style="justify-self:start">Mark lost</button>
+        </form>
+      </div>`}
+
+      <div class="section">
+        <h3>History</h3>
+        ${events.length ? `<ul class="timeline">${events.map((e) => `<li><span class="d">${fmtDate(e.at)}</span><span>${e.html}</span></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">No contacts logged yet.</p>`}
+      </div>
+
+      <div class="dlg-actions" style="justify-content:space-between">
+        <button class="btn danger" type="button" data-delete>Delete client</button>
+        <button class="btn" type="button" data-edit>Edit details</button>
+      </div>`;
+
+    for (const [id, v] of Object.entries(keep)) { const el = document.getElementById(id); if (el) el.value = v; }
+  }
+
+  function openClient(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c) return;
+    openId = id;
+    renderClient(c, false);
+    const d = $("#dlgClient");
+    if (!d.open) d.showModal();
+    $("#dcBody").scrollTop = 0;
+  }
+
+  $("#dlgClient").addEventListener("close", () => { openId = null; });
+
+  $("#dcBody").addEventListener("click", async (e) => {
+    const c = clients.find((x) => x.id === openId);
+    if (!c) return;
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.hasAttribute("data-copy-phone")) copy(c.phone, "Number");
+    else if (t.hasAttribute("data-copy-msg")) copy($("#dcMsg").textContent, "Message");
+    else if (t.hasAttribute("data-edit")) { $("#dlgClient").close(); openEdit(c); }
+    else if (t.hasAttribute("data-reopen")) {
+      const next = { ...c, stage: "new", followUp: "" };
+      if (await save(next)) { toast("Reopened. Update the expiry date if they took a new policy elsewhere."); $("#dlgClient").close(); openEdit(next); }
+    } else if (t.hasAttribute("data-delete")) {
+      if (!t.classList.contains("armed")) { t.classList.add("armed"); t.textContent = "Click again to delete for good"; setTimeout(() => { t.classList.remove("armed"); t.textContent = "Delete client"; }, 4000); return; }
+      try { await store.remove(c.id); $("#dlgClient").close(); toast(`Deleted ${c.name}`); } catch { toast("Couldn't delete. Try again."); }
+    }
+  });
+
+  $("#dcBody").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const c = clients.find((x) => x.id === openId);
+    if (!c) return;
+    const f = e.target;
+    if (f.id === "touchForm") {
+      const outcome = $("#tOutcome").value;
+      const touch = { at: $("#tAt").value || todayIso(), channel: $("#tChannel").value, outcome, note: $("#tNote").value.trim() };
+      let stage = c.stage;
+      if (outcome === "Reached — quote sent") stage = "quoted";
+      else if (stage === "new" && outcome !== "No answer") stage = "contacted";
+      let followUp = $("#tNext").value;
+      if (!followUp && (outcome === "No answer" || outcome === "Asked to call back")) followUp = addDays(todayIso(), 1);
+      if (await save({ ...c, stage, followUp, touches: [...(c.touches || []), touch] })) {
+        toast(followUp ? `Saved. Follow-up set for ${fmtShort(followUp)}` : "Contact saved");
+        $("#tNote").value = ""; $("#tNext").value = "";
+      }
+    } else if (f.id === "renewForm") {
+      const newExpiry = $("#rExpiry").value;
+      if (!newExpiry) return;
+      const prem = $("#rPremium").value;
+      const history = [...(c.history || []), { expiry: c.expiry, result: "renewed", at: todayIso(), premium: prem === "" ? null : Number(prem) }];
+      if (await save({ ...c, expiry: newExpiry, premium: prem === "" ? c.premium : Number(prem), stage: "new", followUp: "", history })) {
+        toast(`${c.name} renewed to ${fmtDate(newExpiry)}`); $("#dlgClient").close();
+      }
+    } else if (f.id === "lostForm") {
+      const reason = $("#lReason").value, note = $("#lNote").value.trim();
+      const history = [...(c.history || []), { expiry: c.expiry, result: "lost", at: todayIso(), reason, note }];
+      const touches = note ? [...(c.touches || []), { at: todayIso(), channel: "Note", outcome: "Marked lost", note }] : (c.touches || []);
+      if (await save({ ...c, stage: "lost", followUp: "", history, touches })) { toast(`${c.name} marked lost`); $("#dlgClient").close(); }
+    }
+  });
+
+  // ---------- add / edit ----------
+  let editingId = null;
+  const fields = { name: "#fName", phone: "#fPhone", email: "#fEmail", vehicle: "#fVehicle", plate: "#fPlate", insurer: "#fInsurer", policyNo: "#fPolicy", expiry: "#fExpiry", premium: "#fPremium", ncd: "#fNcd", notes: "#fNotes" };
+
+  function setTab(name) {
+    document.querySelectorAll("#editTabs .tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+    $("#formClient").hidden = name !== "one";
+    $("#formCsv").hidden = name !== "csv";
+  }
+
+  function openEdit(c) {
+    editingId = c ? c.id : null;
+    $("#deTitle").textContent = c ? `Edit ${c.name}` : "Add client";
+    $("#fSubmit").textContent = c ? "Save changes" : "Add client";
+    $("#editTabs").hidden = !!c;
+    setTab("one");
+    for (const [k, sel] of Object.entries(fields)) $(sel).value = c ? (c[k] ?? "") : "";
+    if (!c) $("#fExpiry").value = addYears(todayIso(), 1);
+    $("#dlgEdit").showModal();
+    $("#fName").focus();
+  }
+
+  $("#editTabs").addEventListener("click", (e) => { const t = e.target.closest(".tab"); if (t) setTab(t.dataset.tab); });
+
+  $("#formClient").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = {};
+    for (const [k, sel] of Object.entries(fields)) v[k] = $(sel).value.trim();
+    v.premium = v.premium === "" ? null : Number(v.premium);
+    v.ncd = v.ncd === "" ? null : Number(v.ncd);
+    v.plate = v.plate.toUpperCase();
+    const existing = clients.find((x) => x.id === editingId);
+    const c = existing ? { ...existing, ...v } : { id: uid(), ...v, stage: "new", followUp: "", touches: [], history: [], createdAt: todayIso() };
+    if (await save(c)) {
+      $("#dlgEdit").close();
+      toast(existing ? "Changes saved" : `${c.name} added. ${daysUntil(c.expiry) <= 60 ? "They're in today's calls." : `First touch on ${fmtShort(addDays(c.expiry, -60))}.`}`);
+    }
+  });
+
+  // CSV import
+  function parseCsv(text) {
+    const rows = []; let row = [], cell = "", q = false;
+    const delim = (text.split("\n")[0].match(/\t/g) || []).length > (text.split("\n")[0].match(/,/g) || []).length ? "\t" : ",";
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === delim) { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+      else cell += ch;
+    }
+    if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter((r) => r.some((x) => x.trim() !== ""));
+  }
+  function normDate(s) {
+    s = String(s || "").trim();
+    let m;
+    if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+    if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+    return "";
+  }
+  const HEADER_MAP = { name: "name", client: "name", "client name": "name", customer: "name", phone: "phone", mobile: "phone", "phone number": "phone", contact: "phone", email: "email", vehicle: "vehicle", car: "vehicle", model: "vehicle", plate: "plate", "plate number": "plate", registration: "plate", "reg no": "plate", insurer: "insurer", insurance: "insurer", company: "insurer", policy: "policyNo", "policy no": "policyNo", "policy number": "policyNo", expiry: "expiry", "expiry date": "expiry", "renewal date": "expiry", "due date": "expiry", premium: "premium", ncd: "ncd", notes: "notes", note: "notes" };
+  let csvParsed = [];
+  function previewCsv() {
+    const rows = parseCsv($("#csvText").value);
+    csvParsed = [];
+    if (rows.length < 2) { $("#csvPreview").textContent = rows.length ? "Add at least one row under the header." : ""; $("#csvSubmit").disabled = true; return; }
+    const head = rows[0].map((h) => HEADER_MAP[h.trim().toLowerCase().replace(/[._]/g, " ").replace(/\s+/g, " ")] || null);
+    if (!head.includes("name") || !head.includes("expiry")) { $("#csvPreview").textContent = "The header needs at least a name column and an expiry column."; $("#csvSubmit").disabled = true; return; }
+    let skipped = 0;
+    for (const r of rows.slice(1)) {
+      const o = {};
+      head.forEach((k, i) => { if (k) o[k] = (r[i] || "").trim(); });
+      o.expiry = normDate(o.expiry);
+      if (!o.name || !o.expiry) { skipped++; continue; }
+      o.premium = o.premium ? Number(String(o.premium).replace(/[^\d.]/g, "")) || null : null;
+      o.ncd = o.ncd ? Number(String(o.ncd).replace(/[^\d.]/g, "")) || null : null;
+      o.plate = (o.plate || "").toUpperCase();
+      csvParsed.push(o);
+    }
+    $("#csvPreview").textContent = `${csvParsed.length} client${csvParsed.length === 1 ? "" : "s"} ready to import${skipped ? `, ${skipped} row${skipped === 1 ? "" : "s"} skipped (missing name or readable expiry date)` : ""}.`;
+    $("#csvSubmit").disabled = !csvParsed.length;
+    $("#csvSubmit").textContent = csvParsed.length ? `Import ${csvParsed.length}` : "Import";
+  }
+  let csvT;
+  $("#csvText").addEventListener("input", () => { clearTimeout(csvT); csvT = setTimeout(previewCsv, 200); });
+  $("#csvFile").addEventListener("change", (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => { $("#csvText").value = String(r.result || ""); previewCsv(); };
+    r.readAsText(file);
+  });
+  $("#formCsv").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("#csvSubmit"); btn.disabled = true;
+    let ok = 0;
+    for (const o of csvParsed) {
+      const c = { id: uid(), name: o.name, phone: o.phone || "", email: o.email || "", vehicle: o.vehicle || "", plate: o.plate, insurer: o.insurer || "", policyNo: o.policyNo || "", expiry: o.expiry, premium: o.premium, ncd: o.ncd, notes: o.notes || "", stage: "new", followUp: "", touches: [], history: [], createdAt: todayIso() };
+      if (await save(c)) ok++; else break;
+    }
+    toast(`Imported ${ok} client${ok === 1 ? "" : "s"}`);
+    $("#csvText").value = ""; $("#csvFile").value = ""; previewCsv();
+    $("#dlgEdit").close();
+  });
+
+  // ---------- settings ----------
+  function openSettings() {
+    $("#sDealer").value = settings.dealer || "";
+    $("#sAgent").value = settings.agent || "";
+    $("#sCurrency").value = settings.currency || "";
+    $("#sCountry").value = settings.country || "";
+    $("#sTarget").value = settings.target || 90;
+    $("#dlgSettings").showModal();
+  }
+  $("#formSettings").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const next = { dealer: $("#sDealer").value.trim(), agent: $("#sAgent").value.trim(), currency: $("#sCurrency").value.trim() || "RM", country: $("#sCountry").value.replace(/\D/g, ""), target: Math.min(100, Math.max(50, Number($("#sTarget").value) || 90)) };
+    try { await store.saveSettings(next); settings = next; render(); $("#dlgSettings").close(); toast("Settings saved"); }
+    catch { toast("Couldn't save settings. You may have view-only access."); }
+  });
+  $("#btnClearExamples").addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Click again to remove them"; setTimeout(() => { b.classList.remove("armed"); b.textContent = "Remove example clients"; }, 4000); return; }
+    const ex = clients.filter((c) => c.example);
+    for (const c of ex) { try { await store.remove(c.id); } catch { /* keep going */ } }
+    $("#dlgSettings").close(); toast(`Removed ${ex.length} example clients`);
+  });
+
+  // ---------- export ----------
+  function toCsv() {
+    const cols = ["name", "phone", "email", "vehicle", "plate", "insurer", "policyNo", "expiry", "premium", "ncd", "stage", "followUp", "lastContact", "notes"];
+    const cell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    return [cols.join(","), ...clients.map((c) => cols.map((k) => cell(k === "lastContact" ? lastTouch(c) : k === "stage" ? (status(c).key === "renewed" ? "Renewed" : STAGES[c.stage]) : c[k])).join(","))].join("\n");
+  }
+  $("#btnExport").addEventListener("click", async () => {
+    const data = toCsv();
+    const filename = `renewal-book-${todayIso()}.csv`;
+    if (downloads) {
+      try { await downloads.save({ filename, data }); } catch { toast("Export cancelled"); }
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([data], { type: "text/csv" }));
+      a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    }
+  });
+
+  // ---------- wiring ----------
+  document.addEventListener("click", (e) => {
+    const close = e.target.closest("[data-close]");
+    if (close) { close.closest("dialog").close(); return; }
+    const op = e.target.closest("[data-open]");
+    if (op) { openClient(op.dataset.open); return; }
+    const f = e.target.closest("[data-filter]");
+    if (f) { filter = f.dataset.filter; renderBook(); return; }
+    if (e.target.closest("[data-action='add']")) openEdit(null);
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr[data-open]")) { e.preventDefault(); openClient(e.target.dataset.open); }
+  });
+  document.querySelectorAll("dialog").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+  $("#btnAdd").addEventListener("click", () => openEdit(null));
+  $("#btnSettings").addEventListener("click", openSettings);
+  let searchT;
+  $("#search").addEventListener("input", (e) => { clearTimeout(searchT); searchT = setTimeout(() => { query = e.target.value; renderBook(); }, 120); });
+
+  // ---------- boot ----------
+  function start(s) {
+    store = s;
+    if (s.mode === "local") {
+      const b = $("#modeBanner");
+      b.hidden = false;
+      b.textContent = window.claude ? "Sign in to claude.ai to keep this client book in your account. Until then, clients are saved in this browser only." : "Running as a standalone file: clients are saved in this browser only. Use Export CSV regularly as a backup.";
+      setNote("Saved in this browser");
+    } else setNote("Saved to your account · updates live across devices");
+    s.subscribe((list) => { clients = list; render(); }, (st) => { settings = { ...settings, ...st }; render(); });
+  }
+
+  render();
+  (async () => {
+    const hasRuntime = !!(window.claude && typeof window.claude.use === "function");
+    if (!hasRuntime) { $("#btnExport").hidden = false; start(makeLocalStore()); return; }
+    const [db, dl] = await Promise.all([window.claude.use("db").catch(() => null), window.claude.use("downloads").catch(() => null)]);
+    downloads = dl;
+    $("#btnExport").hidden = !dl;
+    start(db ? makeDbStore(db) : makeLocalStore());
+  })();
+})();
+</script>
